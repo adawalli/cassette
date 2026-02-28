@@ -93,9 +93,9 @@ The package is published as `@cassette-meetings/cli` under the `cassette-meeting
 
 3. Publish:
    ```bash
-   npm publish --access public
+   bun run release
    ```
-   `prepublishOnly` runs `bun test && bun run build` automatically before publishing.
+   This runs `npm publish --access public`. The `prepublishOnly` hook runs `bun test && bun run build` automatically first.
 
 4. Tag the release in git:
    ```bash

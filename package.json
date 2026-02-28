@@ -25,7 +25,8 @@
   "scripts": {
     "build": "bun build index.ts --outdir dist --target bun --banner '#!/usr/bin/env bun' && chmod +x dist/index.js",
     "prepare": "husky || true",
-    "prepublishOnly": "bun test && bun run build"
+    "prepublishOnly": "bun test && bun run build",
+    "release": "npm publish --access public"
   },
   "lint-staged": {
     "*.{json,md,yaml,yml}": [
