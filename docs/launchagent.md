@@ -59,3 +59,20 @@ launchctl kickstart -k gui/$(id -u)/com.example.cassette
 ```bash
 launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.example.cassette.plist
 ```
+
+## 4. Tail logs
+
+Follow stdout and stderr in real time:
+
+```bash
+tail -f ~/Library/Logs/cassette.log
+tail -f ~/Library/Logs/cassette.error.log
+```
+
+Or watch both streams together:
+
+```bash
+tail -f ~/Library/Logs/cassette.log ~/Library/Logs/cassette.error.log
+```
+
+The log level defaults to `info`. Set `LOG_LEVEL=debug` in the `EnvironmentVariables` dict of your plist for more verbose output.
