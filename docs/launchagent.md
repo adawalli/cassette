@@ -31,6 +31,12 @@ Save this as `~/Library/LaunchAgents/com.example.cassette.plist` (replace `com.e
     <key>KeepAlive</key>
     <true/>
 
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>OPENAI_API_KEY</key>
+      <string>sk-...</string>
+    </dict>
+
     <key>StandardOutPath</key>
     <string>/path/to/Library/Logs/cassette.log</string>
     <key>StandardErrorPath</key>
