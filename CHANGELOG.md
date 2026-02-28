@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2](https://github.com/adawalli/cassette/compare/v0.2.1...v0.2.2) (2026-02-28)
+
+
+### Bug Fixes
+
+* CI pipeline fixes for npm OIDC publishing ([f8c3dbe](https://github.com/adawalli/cassette/commit/f8c3dbefbf1eb00f867dacbe0087cee66a245500))
+* tighten minimum bun engine version to 1.1.0 ([0ff58b4](https://github.com/adawalli/cassette/commit/0ff58b4b8b104c1ff7b2b2d85359996300d40fa0))
+
 ## [0.2.1](https://github.com/adawalli/cassette/compare/v0.2.0...v0.2.1) (2026-02-28)
 
 
