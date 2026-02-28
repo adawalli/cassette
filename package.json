@@ -1,6 +1,6 @@
 {
   "name": "@cassette-meetings/cli",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "CLI tool that watches a directory for meeting transcripts and produces clean Markdown summaries using an LLM",
   "module": "dist/index.js",
   "type": "module",
