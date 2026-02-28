@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/adawalli/cassette/compare/v0.2.2...v0.2.3) (2026-02-28)
+
+
+### Bug Fixes
+
+* remove registry-url from setup-node to unblock npm OIDC auth ([f91830b](https://github.com/adawalli/cassette/commit/f91830b86306dd8acbefcbfe2eb9d51d9b5a39f0))
+
 ## [0.2.2](https://github.com/adawalli/cassette/compare/v0.2.1...v0.2.2) (2026-02-28)
 
 
