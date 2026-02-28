@@ -5,8 +5,7 @@ on:
     types: [published]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
   id-token: write # Required for OIDC trusted publishing
 
 jobs:
@@ -14,9 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -24,30 +20,9 @@ jobs:
 
       - run: bun install
 
-      - name: Set version from release tag
-        run: npm version --no-git-tag-version "${GITHUB_REF_NAME#v}"
-
       - run: bun test
 
       - run: bun run build
 
       - name: Publish to npm
         run: npm publish --access public --provenance --ignore-scripts
-
-      - name: Open version bump PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          BRANCH="chore/release-v${VERSION}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
-          git add package.json
-          git commit -m "chore: bump version to ${VERSION}"
-          git push origin "$BRANCH"
-          gh pr create \
-            --title "chore: bump version to ${VERSION}" \
-            --body "Automated version bump from release ${GITHUB_REF_NAME}." \
-            --base main \
-            --head "$BRANCH"
