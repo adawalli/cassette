@@ -1,0 +1,31 @@
+{
+  "name": "cassette",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{json,md,yaml,yml}": [
+      "prettier --write"
+    ]
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^25.3.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "jsonpath-plus": "^10.4.0",
+    "openai": "^6.22.0",
+    "p-retry": "^7.1.1",
+    "picomatch": "^4.0.3",
+    "zod": "^4.3.6"
+  }
+}
