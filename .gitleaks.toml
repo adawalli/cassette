@@ -1,0 +1,8 @@
+title = "cassette"
+
+[allowlist]
+  description = "Allowlisted paths"
+  paths = [
+    '''test/''',
+    '''\.env\.example$''',
+  ]
