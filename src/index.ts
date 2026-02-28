@@ -48,9 +48,9 @@ export function parseArgs(argv: string[]): CliArgs {
 export function helpText(): string {
   return [
     "Usage:",
-    "  bun run index.ts [--config <path>] [--once]",
-    "  bun run index.ts init [--config <path>] [--force]",
-    "  bun run index.ts --help",
+    "  cassette [--config <path>] [--once]",
+    "  cassette init [--config <path>] [--force]",
+    "  cassette --help",
     "",
     "Commands:",
     "  init     Create a starter config file at the resolved config path.",
