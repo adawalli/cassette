@@ -59,9 +59,11 @@ bunx @cassette-meetings/cli --help
 
 For regular use, install globally so `cassette` is available as a command:
 
+> **Prerequisite:** [Bun](https://bun.sh) must be installed - the CLI requires it at runtime.
+
 ```bash
-bun add -g @cassette-meetings/cli
-# or
+bun add -g @cassette-meetings/cli   # recommended
+# or, if you prefer npm (Bun still required at runtime):
 npm install -g @cassette-meetings/cli
 ```
 
