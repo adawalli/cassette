@@ -1,12 +1,19 @@
 {
   "name": "@cassette-meetings/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "CLI tool that watches a directory for meeting transcripts and produces clean Markdown summaries using an LLM",
   "module": "dist/index.js",
   "type": "module",
   "license": "MIT",
   "author": "cassette-meetings",
-  "keywords": ["meeting", "transcript", "llm", "cli", "vtt", "openai"],
+  "keywords": [
+    "meeting",
+    "transcript",
+    "llm",
+    "cli",
+    "vtt",
+    "openai"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/adawalli/cassette.git"
@@ -21,7 +28,11 @@
   "bin": {
     "cassette": "dist/index.js"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "publishConfig": {
     "access": "public",
     "provenance": true
