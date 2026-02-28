@@ -125,7 +125,7 @@ Each step accepts:
 
 You must use either `prompt:` or `steps:`, not both.
 
-Full example with all options: `config.example.yaml`
+Full example with all options: [config.example.yaml](config.example.yaml)
 
 Generate starter config automatically:
 
@@ -180,8 +180,8 @@ cassette --help
 
 ## macOS LaunchAgent
 
-See `docs/launchagent.md`.
+See [docs/launchagent.md](docs/launchagent.md).
 
 ## Contributing
 
-See `DEVELOPER.md` for setup, development workflow, and publishing instructions.
+See [DEVELOPER.md](DEVELOPER.md) for setup, development workflow, and publishing instructions.
