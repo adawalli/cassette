@@ -22,6 +22,10 @@
     "cassette": "dist/index.js"
   },
   "files": ["dist", "README.md", "LICENSE"],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "bun build index.ts --outdir dist --target bun --banner '#!/usr/bin/env bun' && chmod +x dist/index.js",
     "prepare": "husky || true",
