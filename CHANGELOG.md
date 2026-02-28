@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/adawalli/cassette/compare/v0.2.0...v0.2.1) (2026-02-28)
+
+
+### Bug Fixes
+
+* remove manual release script superseded by CI ([3215cd4](https://github.com/adawalli/cassette/commit/3215cd4a2dd0496c86f144789202ddcbe5629bdb))
+* remove manual release script superseded by CI ([9f58747](https://github.com/adawalli/cassette/commit/9f587479121817853da712c1aa2d86002ef0d4ce))
+
 ## [0.2.0](https://github.com/adawalli/cassette/compare/0.1.1...v0.2.0) (2026-02-28)
 
 
