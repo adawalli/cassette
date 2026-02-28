@@ -51,8 +51,20 @@ sequenceDiagram
 
 ## Install
 
+Try it without installing:
+
 ```bash
-bun install
+bunx @cassette-meetings/cli --help
+```
+
+For regular use, install globally so `cassette` is available as a command:
+
+> **Prerequisite:** [Bun](https://bun.sh) must be installed - the CLI requires it at runtime.
+
+```bash
+bun add -g @cassette-meetings/cli   # recommended
+# or, if you prefer npm (Bun still required at runtime):
+npm install -g @cassette-meetings/cli
 ```
 
 ## Configure
@@ -116,13 +128,13 @@ Full example with all options: `config.example.yaml`
 Generate starter config automatically:
 
 ```bash
-bun run index.ts init
+cassette init
 ```
 
 Force overwrite existing config:
 
 ```bash
-bun run index.ts init --force
+cassette init --force
 ```
 
 Set credentials:
@@ -143,33 +155,31 @@ export OPENAI_API_KEY="..."
 One-off backfill:
 
 ```bash
-bun run index.ts --once
+cassette --once
 ```
 
 Long-running watch mode:
 
 ```bash
-bun run index.ts
+cassette
 ```
 
 Custom config path:
 
 ```bash
-bun run index.ts --config /path/to/config.yaml
+cassette --config /path/to/config.yaml
 ```
 
 Show help:
 
 ```bash
-bun run index.ts --help
-```
-
-## Test
-
-```bash
-bun test
+cassette --help
 ```
 
 ## macOS LaunchAgent
 
 See `docs/launchagent.md`.
+
+## Contributing
+
+See `DEVELOPER.md` for setup, development workflow, and publishing instructions.

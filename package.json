@@ -1,10 +1,32 @@
 {
-  "name": "cassette",
-  "module": "index.ts",
+  "name": "@cassette-meetings/cli",
+  "version": "0.1.0",
+  "description": "CLI tool that watches a directory for meeting transcripts and produces clean Markdown summaries using an LLM",
+  "module": "dist/index.js",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "author": "cassette-meetings",
+  "keywords": ["meeting", "transcript", "llm", "cli", "vtt", "openai"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adawalli/cassette.git"
+  },
+  "homepage": "https://github.com/adawalli/cassette#readme",
+  "bugs": {
+    "url": "https://github.com/adawalli/cassette/issues"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "bin": {
+    "cassette": "dist/index.js"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
-    "prepare": "husky"
+    "build": "bun build index.ts --outdir dist --target bun --banner '#!/usr/bin/env bun' && chmod +x dist/index.js",
+    "prepare": "husky || true",
+    "prepublishOnly": "bun test && bun run build",
+    "release": "npm publish --access public"
   },
   "lint-staged": {
     "*.{json,md,yaml,yml}": [
