@@ -47,3 +47,18 @@ Credentials: `OPENAI_API_KEY` env var (validated via `EnvSchema` at startup). `L
 ## Tests
 
 Tests live in `test/` and mirror the `src/` module structure. The LLM is always mocked - tests inject a fake `LlmClient`. Run a single test file with `bun test test/<file>.test.ts`.
+
+## Versioning and releases
+
+This project uses [release-please](https://github.com/googleapis/release-please) for automated releases. **Commit message prefixes directly control what version gets published to npm** - always choose the right prefix:
+
+| Prefix | Version bump | When to use |
+|--------|-------------|-------------|
+| `fix:` | patch (`0.1.0` → `0.1.1`) | Bug fixes, correcting wrong behavior |
+| `feat:` | minor (`0.1.0` → `0.2.0`) | New user-facing functionality, backwards compatible |
+| `feat!:` | major (`0.1.0` → `1.0.0`) | Breaking changes to config schema, CLI flags, or output format |
+| `chore:`, `docs:`, `ci:`, `refactor:`, `test:` | none (changelog only) | Internal changes with no user impact |
+
+A `BREAKING CHANGE:` footer in any commit body also triggers a major bump.
+
+release-please accumulates commits and opens a Release PR. Merging that PR triggers the npm publish automatically. Never manually bump `package.json` or create GitHub Releases.

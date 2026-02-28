@@ -70,9 +70,48 @@ Or pass `--debug` as a CLI flag.
 
 ## Publishing to npm
 
-The package is published as `@cassette-meetings/cli` under the `cassette-meetings` npm org. Publishing is automated via GitHub Actions using [NPM Trusted Publishing](https://docs.npmjs.com/generating-provenance-statements) (OIDC) - no tokens or secrets required.
+The package is published as `@cassette-meetings/cli` under the `cassette-meetings` npm org. The release process is fully automated via two GitHub Actions workflows - you never manually bump versions or publish.
 
-### One-time setup (per package maintainer account)
+### How it works
+
+**`release-please.yml`** runs on every push to `main`. It analyzes commits since the last release and maintains an open "Release PR" (titled e.g. `chore(main): release 0.1.1`). That PR contains:
+- The version bump in `package.json`
+- An updated `CHANGELOG.md`
+
+**`publish.yml`** triggers when the Release PR is merged. It runs tests, builds, and publishes to npm using OIDC (no tokens required).
+
+### Release flow
+
+1. Merge your PRs to `main` as normal
+2. release-please automatically opens/updates a Release PR - no action needed from you
+3. When you're ready to ship, review and merge the Release PR
+4. The GitHub Release and npm publish happen automatically
+
+That's it. No manual version bumps, no manual tagging, no `npm publish` locally.
+
+### Controlling the version bump
+
+Commit message prefixes determine the bump type:
+
+| Prefix | Bump | Example |
+|--------|------|---------|
+| `fix:` | patch (`0.1.0` → `0.1.1`) | `fix: handle empty VTT files` |
+| `feat:` | minor (`0.1.0` → `0.2.0`) | `feat: add JSON output format` |
+| `feat!:` or `BREAKING CHANGE:` in body | major (`0.1.0` → `1.0.0`) | `feat!: rename config field` |
+
+Other prefixes (`chore:`, `docs:`, `ci:`, etc.) appear in the changelog but don't trigger a release on their own.
+
+### Release infrastructure files
+
+These files are managed automatically - **do not edit them manually**:
+
+- `.release-please-manifest.json` - tracks the last released version; updated by the bot on each release
+- `release-please-config.json` - static config telling release-please this is a Node package
+- `CHANGELOG.md` - auto-generated on each release
+
+### One-time npm setup (per maintainer)
+
+Publishing uses OIDC Trusted Publishing - no npm tokens needed. If setting up on a new npm account:
 
 1. Go to https://www.npmjs.com/package/@cassette-meetings/cli
 2. Navigate to **Settings > Trusted publishing**
@@ -80,28 +119,6 @@ The package is published as `@cassette-meetings/cli` under the `cassette-meeting
    - **GitHub org/user**: `adawalli`
    - **Repository**: `cassette`
    - **Workflow filename**: `publish.yml`
-4. Optionally enable **"Disallow tokens"** to block all classic-token publishes
-
-### Publishing a new version
-
-1. Bump the version in `package.json` following semver:
-   - Patch (`0.1.1`) - bug fixes only
-   - Minor (`0.2.0`) - new features, backwards compatible
-   - Major (`1.0.0`) - breaking changes
-
-2. Commit and push:
-   ```bash
-   git add package.json
-   git commit -m "chore: bump version to X.Y.Z"
-   git push origin main
-   ```
-
-3. Go to [GitHub Releases](https://github.com/adawalli/cassette/releases) and click **Draft a new release**:
-   - Set the tag to `vX.Y.Z` (e.g. `v0.2.0`) - GitHub creates it automatically
-   - Write release notes
-   - Click **Publish release**
-
-4. The `publish.yml` workflow fires automatically and publishes to npm with provenance attestations.
 
 ### After publishing
 
