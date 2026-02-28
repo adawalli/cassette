@@ -78,7 +78,7 @@ The package is published as `@cassette-meetings/cli` under the `cassette-meeting
 - The version bump in `package.json`
 - An updated `CHANGELOG.md`
 
-**`publish.yml`** triggers when the Release PR is merged. It runs tests, builds, and publishes to npm using OIDC (no tokens required).
+**`publish.yml`** triggers when release-please creates a GitHub Release (which happens automatically when the Release PR is merged). It runs tests, builds, and publishes to npm using OIDC (no tokens required).
 
 ### Release flow
 
@@ -103,7 +103,7 @@ Other prefixes (`chore:`, `docs:`, `ci:`, etc.) appear in the changelog but don'
 
 ### Release infrastructure files
 
-These files are managed automatically - **do not edit them manually**:
+These files are managed automatically by the release-please bot - **do not edit them manually**:
 
 - `.release-please-manifest.json` - tracks the last released version; updated by the bot on each release
 - `release-please-config.json` - static config telling release-please this is a Node package
