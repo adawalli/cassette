@@ -16,14 +16,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/adawalli/cassette.git"
+    "url": "git+https://github.com/adawalli/cassette.git"
   },
   "homepage": "https://github.com/adawalli/cassette#readme",
   "bugs": {
     "url": "https://github.com/adawalli/cassette/issues"
   },
   "engines": {
-    "bun": ">=1.0.0"
+    "bun": ">=1.1.0"
   },
   "bin": {
     "cassette": "dist/index.js"
