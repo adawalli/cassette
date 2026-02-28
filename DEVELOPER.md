@@ -70,13 +70,17 @@ Or pass `--debug` as a CLI flag.
 
 ## Publishing to npm
 
-The package is published as `@cassette-meetings/cli` under the `cassette-meetings` npm org.
+The package is published as `@cassette-meetings/cli` under the `cassette-meetings` npm org. Publishing is automated via GitHub Actions using [NPM Trusted Publishing](https://docs.npmjs.com/generating-provenance-statements) (OIDC) - no tokens or secrets required.
 
-### One-time setup
+### One-time setup (per package maintainer account)
 
-1. Create an account at https://npmjs.com if you don't have one
-2. Create the `cassette-meetings` org at https://www.npmjs.com/org/create
-3. Log in locally: `npm login`
+1. Go to https://www.npmjs.com/package/@cassette-meetings/cli
+2. Navigate to **Settings > Trusted publishing**
+3. Click **Add trusted publisher**, select GitHub Actions, and fill in:
+   - **GitHub org/user**: `adawalli`
+   - **Repository**: `cassette`
+   - **Workflow filename**: `publish.yml`
+4. Optionally enable **"Disallow tokens"** to block all classic-token publishes
 
 ### Publishing a new version
 
@@ -85,23 +89,19 @@ The package is published as `@cassette-meetings/cli` under the `cassette-meeting
    - Minor (`0.2.0`) - new features, backwards compatible
    - Major (`1.0.0`) - breaking changes
 
-2. Dry-run to check what will be included:
+2. Commit and push:
    ```bash
-   npm pack --dry-run
+   git add package.json
+   git commit -m "chore: bump version to X.Y.Z"
+   git push origin main
    ```
-   Should only list files under `dist/`, plus `README.md` and `LICENSE`.
 
-3. Publish:
-   ```bash
-   bun run release
-   ```
-   This runs `npm publish --access public`. The `prepublishOnly` hook runs `bun test && bun run build` automatically first.
+3. Go to [GitHub Releases](https://github.com/adawalli/cassette/releases) and click **Draft a new release**:
+   - Set the tag to `vX.Y.Z` (e.g. `v0.2.0`) - GitHub creates it automatically
+   - Write release notes
+   - Click **Publish release**
 
-4. Tag the release in git:
-   ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
-   ```
+4. The `publish.yml` workflow fires automatically and publishes to npm with provenance attestations.
 
 ### After publishing
 
@@ -110,6 +110,8 @@ Verify the release:
 ```bash
 npm info @cassette-meetings/cli
 ```
+
+Check provenance at: `https://www.npmjs.com/package/@cassette-meetings/cli?activeTab=provenance`
 
 Test a clean install:
 
