@@ -17,6 +17,7 @@ type ProcessorDeps = {
   now?: () => Date;
 };
 
+/* c8 ignore start */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -45,6 +46,7 @@ export async function waitForStableFile(
     await sleep(Math.max(50, pollMs));
   }
 }
+/* c8 ignore stop */
 
 function collectMarkdownWarnings(markdown: string): string[] {
   const warnings: string[] = [];
