@@ -52,11 +52,16 @@ Save this as `~/Library/LaunchAgents/com.example.cassette.plist` (replace `com.e
     <string>/path/to/Library/Logs/cassette.log</string>
     <key>StandardErrorPath</key>
     <string>/path/to/Library/Logs/cassette.error.log</string>
+
+    <key>WatchPaths</key>
+    <array>
+      <string>/path/to/.config/cassette/config.yaml</string>
+    </array>
   </dict>
 </plist>
 ```
 
-Do not use `WatchPaths`. The app performs its own internal file watch loop.
+`WatchPaths` on the config file causes launchd to restart cassette whenever config changes, picking up the new settings automatically. Do not add `WatchPaths` for the transcript directory (`watch.root_dir`) - cassette handles that watch internally.
 
 ## 2. Load agent
 
