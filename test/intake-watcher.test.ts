@@ -18,8 +18,12 @@ mock.module("node:fs", () => ({
   },
 }));
 
-// Also mock waitForStableFile so tests don't poll the filesystem
+// Import real processor first so all its exports survive in the mock.
+// Without this spread, mock.module strips processTranscriptFile and breaks
+// processor.test.ts when bun runs files alphabetically (intake-watcher before processor).
+const realProcessor = await import("../src/processor");
 mock.module("../src/processor", () => ({
+  ...realProcessor,
   waitForStableFile: async () => {},
 }));
 
