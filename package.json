@@ -23,6 +23,7 @@
     "url": "https://github.com/adawalli/cassette/issues"
   },
   "engines": {
+    "node": ">=18.0.0",
     "bun": ">=1.1.0"
   },
   "bin": {
@@ -38,7 +39,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "bun build index.ts --outdir dist --target bun --banner '#!/usr/bin/env bun' && chmod +x dist/index.js",
+    "build": "bun build index.ts --outdir dist --target node --banner '#!/usr/bin/env node' && chmod +x dist/index.js",
     "prepare": "husky || true",
     "prepublishOnly": "bun test && bun run build"
   },
@@ -62,6 +63,7 @@
     "openai": "^6.22.0",
     "p-retry": "^7.1.1",
     "picomatch": "^4.0.3",
+    "yaml": "^2.8.2",
     "zod": "^4.3.6"
   }
 }
