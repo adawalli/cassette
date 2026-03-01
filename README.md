@@ -56,16 +56,15 @@ sequenceDiagram
 Try it without installing:
 
 ```bash
+npx @cassette-meetings/cli --help
 bunx @cassette-meetings/cli --help
 ```
 
 For regular use, install globally so `cassette` is available as a command:
 
-> **Prerequisite:** [Bun](https://bun.sh) must be installed - the CLI requires it at runtime.
-
 ```bash
 bun add -g @cassette-meetings/cli   # recommended
-# or, if you prefer npm (Bun still required at runtime):
+# or, if you prefer npm:
 npm install -g @cassette-meetings/cli
 ```
 
@@ -146,7 +145,7 @@ cp .env.example .env
 # then edit .env and fill in your key
 ```
 
-Bun automatically loads `.env` at startup. Alternatively, export it directly:
+If you run via Bun, it loads `.env` automatically. If you run via Node/npx, export the variable manually:
 
 ```bash
 export OPENAI_API_KEY="..."

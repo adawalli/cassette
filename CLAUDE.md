@@ -24,7 +24,7 @@ This is a CLI tool that watches a directory for meeting transcript files (JSON o
 5. `src/extract.ts` - Uses `jsonpath-plus` to extract transcript segments from JSON structures, then renders them as `Speaker: text` lines.
 6. `src/vtt-extract.ts` - Parses WebVTT files into transcript units. Handles speaker tags (`<v Speaker>`), merges consecutive cues from the same speaker, and strips timing metadata.
 7. `src/llm.ts` - `LlmClient` interface + `createOpenAILlmClient` factory. Uses the `openai` SDK with `p-retry` for retryable errors (rate limits, 5xx, connection errors).
-8. `src/config.ts` - Loads YAML config via `Bun.YAML.parse`, validates with Zod. Config resolves to `$XDG_CONFIG_HOME/cassette/config.yaml` or `~/.config/cassette/config.yaml`.
+8. `src/config.ts` - Loads YAML config via `yaml package`, validates with Zod. Config resolves to `$XDG_CONFIG_HOME/cassette/config.yaml` or `~/.config/cassette/config.yaml`.
 9. `src/schemas.ts` - All Zod schemas and derived TypeScript types. Single source of truth for the config shape and processing result types.
 10. `src/file-filter.ts` / `src/paths.ts` - Picomatch-based glob filtering (supports `.json` and `.vtt` extensions) and path helpers.
 11. `src/queue.ts` - `SerialQueue` class: chains promises so tasks run one-at-a-time. Errors are caught per-task so the queue never stalls.
