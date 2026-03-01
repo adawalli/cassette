@@ -40,8 +40,10 @@
   },
   "scripts": {
     "build": "bun build index.ts --outdir dist --target node --banner '#!/usr/bin/env node' && chmod +x dist/index.js",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage",
     "prepare": "husky || true",
-    "prepublishOnly": "bun test && bun run build"
+    "prepublishOnly": "bun test --coverage && bun run build"
   },
   "lint-staged": {
     "*.{json,md,yaml,yml}": [

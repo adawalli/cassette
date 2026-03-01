@@ -1,65 +1,12 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile, access } from "node:fs/promises";
+import { describe, expect, test } from "bun:test";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
-import { processTranscriptFile } from "../src/processor";
+import { processTranscriptFile, waitForStableFile } from "../src/processor";
 import type { LlmClient } from "../src/llm";
 import type { ResolvedTranscriberConfig } from "../src/schemas";
+import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
 
-const tempDirs: string[] = [];
-
-async function makeTempDir(): Promise<string> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "cassette-processor-"));
-  tempDirs.push(dir);
-  return dir;
-}
-
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-});
-
-function baseConfig(rootDir: string): ResolvedTranscriberConfig {
-  return {
-    watch: {
-      root_dir: rootDir,
-      stable_window_ms: 50,
-      include_glob: "**/*.json",
-      exclude_glob: ["**/_failed/**"],
-    },
-    output: {
-      markdown_suffix: ".md",
-      overwrite: false,
-    },
-    failure: {
-      move_failed: true,
-      failed_dir_name: "_failed",
-      write_error_log: true,
-    },
-    llm: {
-      base_url: "https://api.openai.com/v1",
-      model: "gpt-4.1-mini",
-      temperature: 0.1,
-      max_tokens: 4000,
-      timeout_ms: 1000,
-      retries: 1,
-    },
-    transcript: {
-      path: "$.segments[*]",
-      speaker_field: "speaker",
-      text_field: "text",
-    },
-    steps: [{ name: "default", prompt: "test prompt" }],
-  };
-}
+installTempDirCleanup();
 
 describe("processTranscriptFile", () => {
   test("writes sibling markdown on success", async () => {
@@ -259,7 +206,8 @@ describe("processTranscriptFile", () => {
       "utf8",
     );
 
-    const llmOutput = "---\ndate: 2026-01-15\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
+    const llmOutput =
+      "---\ndate: 2026-01-15\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
     const llmClient: LlmClient = { generate: async () => llmOutput };
     const config = { ...baseConfig(dir), output: { ...baseConfig(dir).output, copy_to: vaultDir } };
 
@@ -279,7 +227,8 @@ describe("processTranscriptFile", () => {
       "utf8",
     );
 
-    const llmOutput = "---\ndate: 2026-03-10\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
+    const llmOutput =
+      "---\ndate: 2026-03-10\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
     const llmClient: LlmClient = { generate: async () => llmOutput };
     const config = { ...baseConfig(dir), output: { ...baseConfig(dir).output, copy_to: vaultDir } };
 
@@ -310,6 +259,50 @@ describe("processTranscriptFile", () => {
     const errorLogPath = path.join(dir, "_failed", "meeting.error.log");
     expect(await fileExists(failedJsonPath)).toBe(true);
     expect(await fileExists(errorLogPath)).toBe(true);
+  });
+
+  test("does not quarantine when move_failed is false", async () => {
+    const dir = await makeTempDir();
+    const jsonPath = path.join(dir, "meeting.json");
+    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+
+    const llmClient: LlmClient = {
+      generate: async () => {
+        throw new Error("llm error");
+      },
+    };
+
+    const config = {
+      ...baseConfig(dir),
+      failure: { ...baseConfig(dir).failure, move_failed: false },
+    };
+    const result = await processTranscriptFile(jsonPath, config, { llmClient });
+    expect(result.status).toBe("failed");
+    if (result.status === "failed") {
+      expect(result.quarantinedPath).toBeUndefined();
+    }
+  });
+
+  test("uses timestamped path when quarantine target already exists", async () => {
+    const dir = await makeTempDir();
+    const jsonPath = path.join(dir, "meeting.json");
+    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+
+    // Pre-create the expected quarantine target to force timestamp collision path
+    await mkdir(path.join(dir, "_failed"), { recursive: true });
+    await writeFile(path.join(dir, "_failed", "meeting.json"), "existing", "utf8");
+
+    const llmClient: LlmClient = {
+      generate: async () => {
+        throw new Error("upstream error");
+      },
+    };
+
+    const result = await processTranscriptFile(jsonPath, baseConfig(dir), { llmClient });
+    expect(result.status).toBe("failed");
+    if (result.status === "failed") {
+      expect(result.quarantinedPath).toMatch(/\d{4}-\d{2}-\d{2}T/);
+    }
   });
 });
 
@@ -501,5 +494,15 @@ describe("processTranscriptFile - multi-step chaining", () => {
     expect(capturedConfigs[0].temperature).toBe(0.9);
     // other fields come from global config
     expect(capturedConfigs[0].retries).toBe(1);
+  });
+});
+
+describe("waitForStableFile", () => {
+  test("resolves when file is stable", async () => {
+    const dir = await makeTempDir();
+    const filePath = path.join(dir, "stable.json");
+    await writeFile(filePath, "content", "utf8");
+    // stableWindowMs=0 means it returns as soon as it sees the same signature twice
+    await expect(waitForStableFile(filePath, 0, 50)).resolves.toBeUndefined();
   });
 });

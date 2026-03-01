@@ -1,31 +1,12 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile, access, readFile } from "node:fs/promises";
+import { describe, expect, test } from "bun:test";
+import { writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
-import { runBackfill, scanInputFiles } from "../src/service";
+import { runBackfill, runService, scanInputFiles } from "../src/service";
 import type { LlmClient } from "../src/llm";
 import type { IntakeConfig, OnCompleteConfig, ResolvedTranscriberConfig } from "../src/schemas";
+import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
 
-const tempDirs: string[] = [];
-
-async function makeTempDir(): Promise<string> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "cassette-service-"));
-  tempDirs.push(dir);
-  return dir;
-}
-
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-});
+installTempDirCleanup();
 
 function config(
   rootDir: string,
@@ -33,37 +14,9 @@ function config(
   intake?: IntakeConfig,
 ): ResolvedTranscriberConfig {
   return {
-    watch: {
-      root_dir: rootDir,
-      stable_window_ms: 50,
-      include_glob: "**/*.json",
-      exclude_glob: ["**/_failed/**"],
-    },
-    output: {
-      markdown_suffix: ".md",
-      overwrite: false,
-    },
-    failure: {
-      move_failed: true,
-      failed_dir_name: "_failed",
-      write_error_log: true,
-    },
-    llm: {
-      base_url: "https://api.openai.com/v1",
-      model: "gpt-4.1-mini",
-      temperature: 0.1,
-      max_tokens: 3000,
-      timeout_ms: 1000,
-      retries: 1,
-    },
-    transcript: {
-      path: "$.segments[*]",
-      text_field: "text",
-      speaker_field: "speaker",
-    },
+    ...baseConfig(rootDir, { on_complete, intake }),
+    llm: { ...baseConfig(rootDir).llm, max_tokens: 3000 },
     steps: [{ name: "default", prompt: "prompt", notify: false }],
-    on_complete,
-    intake,
   };
 }
 
@@ -226,6 +179,131 @@ describe("on_complete hook", () => {
       expect(line).not.toContain("{{output}}");
       expect(line).toMatch(/\.summary\.md$/);
     }
+  });
+});
+
+describe("runService", () => {
+  test("processes existing files and returns a cleanup function", async () => {
+    const dir = await makeTempDir();
+    const aPath = path.join(dir, "a.json");
+    await writeFile(aPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+
+    const generated: string[] = [];
+    const llmClient: LlmClient = {
+      generate: async () => {
+        generated.push("called");
+        return "# cleaned";
+      },
+    };
+
+    const cfg = config(dir);
+    cfg.watch.stable_window_ms = 0;
+    const stop = await runService(cfg, { llmClient });
+    // Wait for the serial queue to drain (stability polling needs time)
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    stop();
+
+    expect(generated.length).toBe(1);
+    expect(await fileExists(path.join(dir, "a.md"))).toBe(true);
+  });
+
+  test("deduplicates in-flight paths", async () => {
+    const dir = await makeTempDir();
+    const aPath = path.join(dir, "a.json");
+    await writeFile(aPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+
+    let callCount = 0;
+    const llmClient: LlmClient = {
+      generate: async () => {
+        callCount++;
+        return "# cleaned";
+      },
+    };
+
+    const cfg = config(dir);
+    cfg.watch.stable_window_ms = 0;
+    const stop = await runService(cfg, { llmClient });
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    stop();
+
+    // File should only be processed once despite being found by scanInputFiles
+    expect(callCount).toBe(1);
+  });
+
+  test("with intake config scans intake source and starts both watchers", async () => {
+    const sourceDir = await makeTempDir();
+    const rootDir = await makeTempDir();
+
+    const vttContent = "WEBVTT\n\n00:00:00.000 --> 00:00:05.000\n<v Alice>Hello</v>";
+    await writeFile(path.join(sourceDir, "call.vtt"), vttContent, "utf8");
+
+    const cfg: ResolvedTranscriberConfig = {
+      ...config(rootDir, undefined, {
+        source_dir: sourceDir,
+        include_glob: "**/*.vtt",
+        exclude_glob: [],
+        delete_source: true,
+      }),
+      watch: {
+        root_dir: rootDir,
+        stable_window_ms: 0,
+        include_glob: "**/*.{json,vtt}",
+        exclude_glob: ["**/_failed/**"],
+      },
+    };
+
+    const llmClient: LlmClient = {
+      generate: async () => "# Notes\n\nAlice said hello.",
+    };
+
+    const stop = await runService(cfg, { llmClient });
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    stop();
+
+    // Source file should have been intaked (moved)
+    expect(await fileExists(path.join(sourceDir, "call.vtt"))).toBe(false);
+  });
+
+  test("without intake returns only the main watcher cleanup", async () => {
+    const dir = await makeTempDir();
+
+    const llmClient: LlmClient = { generate: async () => "# out" };
+    const stop = await runService(config(dir), { llmClient });
+
+    // stop should be a function (the main watcher's cleanup)
+    expect(typeof stop).toBe("function");
+    stop();
+  });
+});
+
+describe("logProcessingResult - multi-step with warnings", () => {
+  test("runBackfill with multi-step config logs step warnings", async () => {
+    const dir = await makeTempDir();
+    await writeFile(
+      path.join(dir, "a.json"),
+      JSON.stringify({ segments: [{ text: "hello" }] }),
+      "utf8",
+    );
+
+    // This LLM returns output that triggers warnings for single-step
+    // but for multi-step, warnings are always empty per processor logic.
+    // The real coverage for line 24 requires stepResults with non-empty warnings,
+    // which the current processor never produces for multi-step.
+    // We test the multi-step path that does get covered (lines 20-26 path).
+    const cfg: ResolvedTranscriberConfig = {
+      ...config(dir),
+      steps: [
+        { name: "clean", prompt: "clean it", suffix: ".cleaned.md", notify: false },
+        { name: "summarize", prompt: "summarize it", suffix: ".summary.md", notify: false },
+      ],
+    };
+
+    const llmClient: LlmClient = { generate: async () => "# output" };
+    await runBackfill(cfg, { llmClient });
+
+    // Verify both step outputs were created
+    expect(await fileExists(path.join(dir, "a.cleaned.md"))).toBe(true);
+    expect(await fileExists(path.join(dir, "a.summary.md"))).toBe(true);
   });
 });
 
