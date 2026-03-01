@@ -228,7 +228,7 @@ describe("generate - retry behavior", () => {
     expect(callCount).toBe(2);
   });
 
-  test("does NOT retry on 400 AuthenticationError - throws immediately", async () => {
+  test("does NOT retry on 401 AuthenticationError - throws immediately", async () => {
     const { APIError } = await import("openai");
     let callCount = 0;
 

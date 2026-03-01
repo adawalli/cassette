@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import path from "node:path";
 import type { TranscriberConfig } from "../src/schemas";
 
@@ -52,6 +52,10 @@ function makeConfig(overrides?: Partial<TranscriberConfig["watch"]>): Transcribe
     prompt: "test prompt",
   } as TranscriberConfig;
 }
+
+beforeEach(() => {
+  fakeClose.mockClear();
+});
 
 describe("startRecursiveWatcher", () => {
   test("calls onFilePath for matching .json files", () => {
@@ -124,7 +128,6 @@ describe("startRecursiveWatcher", () => {
   });
 
   test("returned cleanup function calls watcher.close()", () => {
-    fakeClose.mockClear();
     const config = makeConfig();
     const cleanup = startRecursiveWatcher({ config, onFilePath: () => {} });
 

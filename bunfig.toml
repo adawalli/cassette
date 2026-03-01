@@ -3,5 +3,5 @@ preload = ["./test/setup.ts"]
 coverageSkipTestFiles = true
 coverageReporter = ["text", "lcov"]
 coverageDir = "coverage"
-coverageThreshold = { line = 0.9, function = 0.8 }
+coverageThreshold = { lines = 0.9, functions = 0.8 }
 coveragePathIgnorePatterns = ["src/index.ts", "src/llm.ts"]

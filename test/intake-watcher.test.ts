@@ -158,15 +158,16 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "exists.vtt"), "WEBVTT\n\nhello", "utf8");
 
     const errorSpy = spyOn(logger, "error").mockImplementation(() => {});
+    const stop = startIntakeWatcher(cfg, () => {
+      throw new Error("downstream failure");
+    });
     try {
-      startIntakeWatcher(cfg, () => {
-        throw new Error("downstream failure");
-      });
       capturedListener("rename", "exists.vtt");
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("[intake] watcher error"));
     } finally {
+      stop();
       errorSpy.mockRestore();
     }
   });
@@ -188,9 +189,11 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     expect(intaked[0]).toContain("buffer.vtt");
   });
 
-  test("returned cleanup function calls watcher.close()", () => {
+  test("returned cleanup function calls watcher.close()", async () => {
     fakeClose.mockClear();
-    const cfg = intakeWatcherConfig("/tmp/root", "/tmp/source");
+    const sourceDir = await makeTempDir();
+    const rootDir = await makeTempDir();
+    const cfg = intakeWatcherConfig(rootDir, sourceDir);
     const stop = startIntakeWatcher(cfg, () => {});
 
     expect(fakeClose).not.toHaveBeenCalled();
