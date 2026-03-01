@@ -12,9 +12,12 @@ cp .env.example .env   # fill in OPENAI_API_KEY
 ```bash
 bun test                          # run all tests
 bun test test/processor.test.ts   # run a single test file
+bun test --coverage               # run tests with coverage report
 bun run index.ts --help           # run from source
 bun run build                     # compile to dist/
 ```
+
+Coverage also runs automatically during `prepublishOnly`, so every npm publish includes a passing coverage check.
 
 ## Running from source vs. built output
 
