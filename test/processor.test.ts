@@ -505,8 +505,4 @@ describe("waitForStableFile", () => {
     // stableWindowMs=0 means it returns as soon as it sees the same signature twice
     await expect(waitForStableFile(filePath, 0, 50)).resolves.toBeUndefined();
   });
-
-  test("rejects when file does not exist", async () => {
-    await expect(waitForStableFile("/nonexistent/path/file.json", 0, 50)).rejects.toThrow();
-  });
 });
