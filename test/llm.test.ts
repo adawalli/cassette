@@ -24,7 +24,6 @@ mock.module("openai", () => {
       },
     };
     constructor(opts: Record<string, unknown>) {
-      createArgs.length = 0; // reset per-instantiation
       Object.assign(this, { _opts: opts });
     }
   }
@@ -83,7 +82,12 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  process.env = { ...originalEnv };
+  for (const key of Object.keys(process.env)) {
+    if (!(key in originalEnv)) {
+      delete process.env[key];
+    }
+  }
+  Object.assign(process.env, originalEnv);
 });
 
 describe("createOpenAILlmClient", () => {

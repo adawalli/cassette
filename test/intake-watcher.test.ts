@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, mock, spyOn, test } from "bun:test";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ResolvedTranscriberConfig } from "../src/schemas";
@@ -29,6 +29,7 @@ mock.module("../src/processor", () => ({
 
 // Dynamic import after mocks are set up
 const { startIntakeWatcher } = await import("../src/intake");
+const { logger } = await import("../src/logger");
 
 installTempDirCleanup();
 
@@ -129,7 +130,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     expect(intaked).toHaveLength(0);
   });
 
-  test("logs non-FileGoneError errors", async () => {
+  test("cleans up inflight set after FileGoneError so file can be reprocessed", async () => {
     const sourceDir = await makeTempDir();
     const rootDir = await makeTempDir();
     const cfg = intakeWatcherConfig(rootDir, sourceDir);
@@ -147,6 +148,27 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     expect(intaked).toHaveLength(1);
+  });
+
+  test("logs error for non-FileGoneError failures", async () => {
+    const sourceDir = await makeTempDir();
+    const rootDir = await makeTempDir();
+    const cfg = intakeWatcherConfig(rootDir, sourceDir);
+
+    await writeFile(path.join(sourceDir, "exists.vtt"), "WEBVTT\n\nhello", "utf8");
+
+    const errorSpy = spyOn(logger, "error").mockImplementation(() => {});
+    try {
+      startIntakeWatcher(cfg, () => {
+        throw new Error("downstream failure");
+      });
+      capturedListener("rename", "exists.vtt");
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("[intake] watcher error"));
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   test("handles Buffer filenames", async () => {
