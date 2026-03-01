@@ -1,65 +1,12 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, writeFile, access } from "node:fs/promises";
+import { describe, expect, test } from "bun:test";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import os from "node:os";
 import { processTranscriptFile } from "../src/processor";
 import type { LlmClient } from "../src/llm";
 import type { ResolvedTranscriberConfig } from "../src/schemas";
+import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
 
-const tempDirs: string[] = [];
-
-async function makeTempDir(): Promise<string> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "cassette-processor-"));
-  tempDirs.push(dir);
-  return dir;
-}
-
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
-});
-
-function baseConfig(rootDir: string): ResolvedTranscriberConfig {
-  return {
-    watch: {
-      root_dir: rootDir,
-      stable_window_ms: 50,
-      include_glob: "**/*.json",
-      exclude_glob: ["**/_failed/**"],
-    },
-    output: {
-      markdown_suffix: ".md",
-      overwrite: false,
-    },
-    failure: {
-      move_failed: true,
-      failed_dir_name: "_failed",
-      write_error_log: true,
-    },
-    llm: {
-      base_url: "https://api.openai.com/v1",
-      model: "gpt-4.1-mini",
-      temperature: 0.1,
-      max_tokens: 4000,
-      timeout_ms: 1000,
-      retries: 1,
-    },
-    transcript: {
-      path: "$.segments[*]",
-      speaker_field: "speaker",
-      text_field: "text",
-    },
-    steps: [{ name: "default", prompt: "test prompt" }],
-  };
-}
+installTempDirCleanup();
 
 describe("processTranscriptFile", () => {
   test("writes sibling markdown on success", async () => {
@@ -259,7 +206,8 @@ describe("processTranscriptFile", () => {
       "utf8",
     );
 
-    const llmOutput = "---\ndate: 2026-01-15\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
+    const llmOutput =
+      "---\ndate: 2026-01-15\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
     const llmClient: LlmClient = { generate: async () => llmOutput };
     const config = { ...baseConfig(dir), output: { ...baseConfig(dir).output, copy_to: vaultDir } };
 
@@ -279,7 +227,8 @@ describe("processTranscriptFile", () => {
       "utf8",
     );
 
-    const llmOutput = "---\ndate: 2026-03-10\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
+    const llmOutput =
+      "---\ndate: 2026-03-10\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
     const llmClient: LlmClient = { generate: async () => llmOutput };
     const config = { ...baseConfig(dir), output: { ...baseConfig(dir).output, copy_to: vaultDir } };
 

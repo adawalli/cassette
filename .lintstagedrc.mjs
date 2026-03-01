@@ -29,7 +29,10 @@ export default {
       if (test) testFiles.add(test);
     }
     const cmds = [`prettier --write ${files.join(" ")}`];
-    if (testFiles.size > 0) cmds.push(`bun test ${[...testFiles].join(" ")}`);
+    // Run each test file separately to avoid mock.module contamination between files
+    for (const tf of testFiles) {
+      cmds.push(`bun test ${tf}`);
+    }
     return cmds;
   },
 };
