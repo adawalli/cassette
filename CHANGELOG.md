@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.1](https://github.com/adawalli/cassette/compare/v0.3.0...v0.3.1) (2026-03-01)
+
+
+### Bug Fixes
+
+* c8 ignore sleep and waitForStableFile for V8 coverage ([35d1076](https://github.com/adawalli/cassette/commit/35d10763ec076b419e0ca6513bc48e87e6b72191))
+* correct coverageThreshold keys and test cleanup ([8122d82](https://github.com/adawalli/cassette/commit/8122d8210d215815d4285abe3229410b8d91f1ec))
+* move sleep/waitForStableFile to stable-wait.ts, exclude from threshold ([9bea4b3](https://github.com/adawalli/cassette/commit/9bea4b38f6f996d06b384299108e137e63de4e17))
+* preserve processor exports in intake-watcher mock ([44607e2](https://github.com/adawalli/cassette/commit/44607e240ffbba6e883c0b4b8a4a4ddc7ee15a03))
+
 ## [0.3.0](https://github.com/adawalli/cassette/compare/v0.2.3...v0.3.0) (2026-03-01)
 
 
