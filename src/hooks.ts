@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { logger } from "./logger";
 import type { OnCompleteConfig } from "./schemas";
 
@@ -11,10 +12,11 @@ export async function runOnCompleteHook(
 ): Promise<void> {
   const command = replaceTemplateVars(hookConfig.command, vars);
 
-  const proc = Bun.spawn(["sh", "-c", command], {
-    stdout: "ignore",
-    stderr: "pipe",
+  const proc = spawn("sh", ["-c", command], {
+    stdio: ["ignore", "ignore", "pipe"],
   });
+  const stderrChunks: Buffer[] = [];
+  proc.stderr?.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
 
   let timedOut = false;
   const timeoutHandle = setTimeout(() => {
@@ -23,12 +25,14 @@ export async function runOnCompleteHook(
   }, hookConfig.timeout_ms);
 
   try {
-    const exitCode = await proc.exited;
+    const exitCode = await new Promise<number>((resolve) => {
+      proc.on("exit", (code) => resolve(code ?? 1));
+    });
 
     if (timedOut) {
       logger.warn(`[hooks] on_complete timed out after ${hookConfig.timeout_ms}ms: ${command}`);
     } else if (exitCode !== 0) {
-      const stderrText = await new Response(proc.stderr).text();
+      const stderrText = Buffer.concat(stderrChunks).toString("utf8");
       const detail = stderrText.trim() ? ` | stderr: ${stderrText.trim()}` : "";
       logger.warn(`[hooks] on_complete failed (exit ${exitCode}): ${command}${detail}`);
     }

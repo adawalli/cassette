@@ -1,6 +1,24 @@
+import { stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 
 export const SUPPORTED_EXTENSIONS = new Set([".json", ".vtt"]);
+
+export async function exists(filePath: string): Promise<boolean> {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function expandTilde(p: string): string {
+  if (p === "~" || p.startsWith("~/") || p.startsWith("~\\")) {
+    return path.join(homedir(), p.slice(1));
+  }
+  return p;
+}
 
 export function markdownPathFor(filePath: string, markdownSuffix: string): string {
   const ext = path.extname(filePath).toLowerCase();

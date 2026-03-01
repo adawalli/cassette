@@ -1,19 +1,14 @@
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+import { parse as parseYaml } from "yaml";
+import { exists, expandTilde } from "./paths";
 import {
   TranscriberConfigSchema,
   type TranscriberConfig,
   type ResolvedTranscriberConfig,
   type StepConfig,
 } from "./schemas";
-
-function expandTilde(p: string): string {
-  if (p === "~" || p.startsWith("~/") || p.startsWith("~\\")) {
-    return path.join(homedir(), p.slice(1));
-  }
-  return p;
-}
 
 export function resolveConfigPath(env: NodeJS.ProcessEnv = process.env): string {
   const xdg = env.XDG_CONFIG_HOME;
@@ -27,7 +22,7 @@ export function resolveConfigPath(env: NodeJS.ProcessEnv = process.env): string 
 export const DEFAULT_CONFIG_YAML = `watch:
   root_dir: ~/Documents/meetings
   stable_window_ms: 3000
-  include_glob: "**/*.json"
+  include_glob: "**/*.{json,vtt}"
   exclude_glob:
     - "**/_failed/**"
 
@@ -93,15 +88,6 @@ prompt: |
 #   timeout_ms: 10000
 `;
 
-async function exists(filePath: string): Promise<boolean> {
-  try {
-    await stat(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export async function initConfigFile(
   configPath: string,
   options?: { force?: boolean },
@@ -140,8 +126,8 @@ export function normalizeSteps(config: TranscriberConfig): ResolvedTranscriberCo
 
 export async function loadConfig(configPath?: string): Promise<ResolvedTranscriberConfig> {
   const resolvedPath = configPath ?? resolveConfigPath();
-  const text = await Bun.file(resolvedPath).text();
-  const parsed = Bun.YAML.parse(text);
+  const text = await readFile(resolvedPath, "utf8");
+  const parsed = parseYaml(text);
   const config = TranscriberConfigSchema.parse(parsed);
   config.watch.root_dir = expandTilde(config.watch.root_dir);
   if (config.intake) {

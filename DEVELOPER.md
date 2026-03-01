@@ -136,4 +136,7 @@ Test a clean install:
 cd $(mktemp -d)
 bun add @cassette-meetings/cli
 bunx cassette --help
+# or with npm:
+npm install -g @cassette-meetings/cli
+npx cassette --help
 ```

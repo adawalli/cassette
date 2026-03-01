@@ -1,22 +1,14 @@
-import { copyFile, mkdir, readdir, rename, stat, unlink } from "node:fs/promises";
+import { copyFile, mkdir, readdir, rename, unlink } from "node:fs/promises";
 import { watch } from "node:fs";
 import path from "node:path";
 import picomatch from "picomatch";
 import { logger } from "./logger";
+import { exists } from "./paths";
 import { waitForStableFile } from "./processor";
 import type { ResolvedTranscriberConfig } from "./schemas";
 
 function normalizeForGlob(filePath: string): string {
   return filePath.split(path.sep).join("/");
-}
-
-async function exists(filePath: string): Promise<boolean> {
-  try {
-    await stat(filePath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function weekDir(now: Date): string {
@@ -45,9 +37,7 @@ class FileGoneError extends Error {
   }
 }
 
-function createIntakeFilter(
-  config: ResolvedTranscriberConfig,
-): (filePath: string) => boolean {
+function createIntakeFilter(config: ResolvedTranscriberConfig): (filePath: string) => boolean {
   const intake = config.intake!;
   const includeMatcher = picomatch(intake.include_glob);
   const excludeMatchers = intake.exclude_glob.map((p) => picomatch(p));
@@ -99,9 +89,7 @@ export async function intakeFile(
   return destPath;
 }
 
-export async function scanIntakeFiles(
-  config: ResolvedTranscriberConfig,
-): Promise<string[]> {
+export async function scanIntakeFiles(config: ResolvedTranscriberConfig): Promise<string[]> {
   const sourceDir = config.intake!.source_dir;
   const shouldIntake = createIntakeFilter(config);
   const results: string[] = [];

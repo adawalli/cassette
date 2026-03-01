@@ -1,10 +1,9 @@
 import { copyFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import path from "node:path";
 import { extractTranscriptUnits, renderTranscript } from "./extract";
 import type { LlmClient } from "./llm";
 import { logger } from "./logger";
-import { isVttPath, markdownPathFor } from "./paths";
+import { exists, expandTilde, isVttPath, markdownPathFor } from "./paths";
 import { extractVttTranscriptUnits } from "./vtt-extract";
 import {
   ProcessingResultSchema,
@@ -20,15 +19,6 @@ type ProcessorDeps = {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function exists(filePath: string): Promise<boolean> {
-  try {
-    await stat(filePath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export async function waitForStableFile(
@@ -91,14 +81,8 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// Some LLMs wrap markdown output in a ```yaml ... ``` or ``` ... ``` code fence.
-// Strip it so frontmatter lands on line 1 and is parsed correctly by editors.
 function stripOuterCodeFence(text: string): string {
   return text.replace(/^```(?:yaml|markdown|md)?\r?\n([\s\S]*?)\r?\n```\s*$/i, "$1");
-}
-
-function expandTilde(filePath: string): string {
-  return filePath.replace(/^~(?=$|\/)/, homedir());
 }
 
 const DATE_PATTERN = /\d{4}-\d{2}-\d{2}/;
@@ -206,8 +190,10 @@ export async function processTranscriptFile(
     logger.debug(`file stabilized: ${filePath}`);
     const filenameDate = recordingDateFromFilename(filePath);
     const recordingDate = filenameDate ?? recordingDateFromBirthtime(await stat(filePath));
-    logger.debug(`recording date: ${recordingDate} (source: ${filenameDate ? "filename" : "birthtime"})`);
-    const raw = await Bun.file(filePath).text();
+    logger.debug(
+      `recording date: ${recordingDate} (source: ${filenameDate ? "filename" : "birthtime"})`,
+    );
+    const raw = await readFile(filePath, "utf8");
     logger.debug(`read input bytes: ${raw.length}`);
     const units = isVttPath(filePath)
       ? extractVttTranscriptUnits(raw)
