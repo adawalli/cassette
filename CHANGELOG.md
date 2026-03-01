@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/adawalli/cassette/compare/v0.2.3...v0.3.0) (2026-03-01)
+
+
+### Features
+
+* add Node/npx runtime compatibility ([e07c702](https://github.com/adawalli/cassette/commit/e07c702d9e8431c8b8877a6b89e2cc0962700f21))
+
+
+### Bug Fixes
+
+* address PR review feedback ([b496593](https://github.com/adawalli/cassette/commit/b4965939d4c68396fd2b76795389aa2a02350980))
+
 ## [0.2.3](https://github.com/adawalli/cassette/compare/v0.2.2...v0.2.3) (2026-02-28)
 
 
