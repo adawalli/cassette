@@ -22,7 +22,7 @@ export function resolveConfigPath(env: NodeJS.ProcessEnv = process.env): string 
 export const DEFAULT_CONFIG_YAML = `watch:
   root_dir: ~/Documents/meetings
   stable_window_ms: 3000
-  include_glob: "**/*.json"
+  include_glob: "**/*.{json,vtt}"
   exclude_glob:
     - "**/_failed/**"
 

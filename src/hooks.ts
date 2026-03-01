@@ -16,7 +16,7 @@ export async function runOnCompleteHook(
     stdio: ["ignore", "ignore", "pipe"],
   });
   const stderrChunks: Buffer[] = [];
-  proc.stderr!.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+  proc.stderr?.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
 
   let timedOut = false;
   const timeoutHandle = setTimeout(() => {
