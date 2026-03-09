@@ -20,7 +20,7 @@ export function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = { command: "run", once: false, force: false, debug: false };
   for (let i = 0; i < argv.length; i += 1) {
     const value = argv[i];
-    if (value === "--version" || value === "-v") {
+    if (value === "--version" || value === "-V") {
       args.command = "version";
       continue;
     }
