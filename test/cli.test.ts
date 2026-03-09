@@ -27,8 +27,8 @@ describe("parseArgs", () => {
     expect(args.command).toBe("version");
   });
 
-  test("parses -v flag", () => {
-    const args = parseArgs(["-v"]);
+  test("parses -V flag", () => {
+    const args = parseArgs(["-V"]);
     expect(args.command).toBe("version");
   });
 });
