@@ -16,26 +16,12 @@ Save this as `~/Library/LaunchAgents/com.example.cassette.plist` (replace `com.e
 
     <key>ProgramArguments</key>
     <array>
-      <string>/opt/homebrew/bin/bun</string>
-      <string>run</string>
-      <string>/path/to/cassette/index.ts</string>
+      <string>/opt/homebrew/bin/bunx</string>
+      <string>-y</string>
+      <string>@cassette-meetings/cli</string>
       <string>--config</string>
       <string>/path/to/.config/cassette/config.yaml</string>
     </array>
-
-    <key>WorkingDirectory</key>
-    <string>/path/to/cassette</string>
-
-    <!-- Alternative: if you installed via npm (bun not required), use the cassette binary directly.
-         Find the path with: which cassette
-         Typical npm global bin paths: ~/.npm-global/bin/cassette or /usr/local/bin/cassette
-    <key>ProgramArguments</key>
-    <array>
-      <string>/usr/local/bin/cassette</string>
-      <string>--config</string>
-      <string>/path/to/.config/cassette/config.yaml</string>
-    </array>
-    -->
 
     <key>RunAtLoad</key>
     <true/>
