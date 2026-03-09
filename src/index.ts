@@ -67,7 +67,7 @@ export function helpText(): string {
     "  --once           Process existing files and exit.",
     "  --debug          Enable verbose debug output.",
     "  --force          Overwrite config when used with init.",
-    "  --version, -v    Show version.",
+    "  --version, -V    Show version.",
     "  --help, -h       Show this help.",
   ].join("\n");
 }
