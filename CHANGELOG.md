@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2](https://github.com/adawalli/cassette/compare/v0.3.1...v0.3.2) (2026-03-09)
+
+
+### Bug Fixes
+
+* Claude ([d72ee96](https://github.com/adawalli/cassette/commit/d72ee9613c2daa970c03ad9e86704b8b90f7079e))
+* Claude ([2de205e](https://github.com/adawalli/cassette/commit/2de205e9cb989ef25debd4881b222ccd260cc862))
+* retry generic APIError with status 429 in LLM client ([daef8e4](https://github.com/adawalli/cassette/commit/daef8e4192ad325413ba2dcdcec4902b789c5b12))
+* retry generic APIError with status 429 in LLM client ([02b62a5](https://github.com/adawalli/cassette/commit/02b62a523393950afb349620c86ab80224760ecb))
+
 ## [0.3.1](https://github.com/adawalli/cassette/compare/v0.3.0...v0.3.1) (2026-03-01)
 
 
