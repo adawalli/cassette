@@ -228,6 +228,26 @@ describe("generate - retry behavior", () => {
     expect(callCount).toBe(2);
   });
 
+  test("retries on generic APIError with status 429 (non-standard rate limit)", async () => {
+    const { APIError } = await import("openai");
+    let callCount = 0;
+
+    chatCreateFn = () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new APIError(429, "Priority-based rate limit exceeded");
+      }
+      return Promise.resolve({
+        choices: [{ message: { content: "success after 429 retry" }, finish_reason: "stop" }],
+      });
+    };
+
+    const client = createOpenAILlmClient({ OPENAI_API_KEY: "sk-test" });
+    const result = await client.generate("prompt", "input", baseLlmConfig({ retries: 2 }));
+    expect(result).toBe("success after 429 retry");
+    expect(callCount).toBe(2);
+  });
+
   test("does NOT retry on 401 AuthenticationError - throws immediately", async () => {
     const { APIError } = await import("openai");
     let callCount = 0;
