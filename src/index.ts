@@ -1,9 +1,12 @@
+import pkg from "../package.json";
 import { initConfigFile, loadConfig, resolveConfigPath } from "./config";
 import { createOpenAILlmClient } from "./llm";
 import { logger } from "./logger";
 import { runBackfill, runService } from "./service";
 
-type CliCommand = "run" | "init" | "help";
+const VERSION = pkg.version;
+
+type CliCommand = "run" | "init" | "help" | "version";
 
 type CliArgs = {
   command: CliCommand;
@@ -17,6 +20,10 @@ export function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = { command: "run", once: false, force: false, debug: false };
   for (let i = 0; i < argv.length; i += 1) {
     const value = argv[i];
+    if (value === "--version" || value === "-v") {
+      args.command = "version";
+      continue;
+    }
     if (value === "help" || value === "--help" || value === "-h") {
       args.command = "help";
       continue;
@@ -60,12 +67,17 @@ export function helpText(): string {
     "  --once           Process existing files and exit.",
     "  --debug          Enable verbose debug output.",
     "  --force          Overwrite config when used with init.",
+    "  --version, -v    Show version.",
     "  --help, -h       Show this help.",
   ].join("\n");
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
+  if (args.command === "version") {
+    console.log(`cassette v${VERSION}`);
+    return;
+  }
   if (args.command === "help") {
     console.log(helpText());
     return;
@@ -86,6 +98,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     );
     return;
   }
+
+  logger.info(`cassette v${VERSION}`);
 
   const resolvedConfigPath = args.configPath ?? resolveConfigPath(process.env);
   let config;
