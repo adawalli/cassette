@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/adawalli/cassette/compare/v0.3.2...v0.4.0) (2026-03-09)
+
+
+### Features
+
+* add --version flag and log version at startup ([e2234e3](https://github.com/adawalli/cassette/commit/e2234e3b692cdcf1ab1f5aa5ec015181f3ffe82c))
+* add --version flag and log version at startup ([c98a87c](https://github.com/adawalli/cassette/commit/c98a87c58c6d96907623fa621f15dfd8f12a522f))
+
 ## [0.3.2](https://github.com/adawalli/cassette/compare/v0.3.1...v0.3.2) (2026-03-09)
 
 
