@@ -80,7 +80,7 @@ function isRetryable(error: unknown): boolean {
     return true;
   }
   if (error instanceof APIError && typeof error.status === "number") {
-    return error.status >= 500;
+    return error.status >= 500 || error.status === 429;
   }
   return false;
 }
