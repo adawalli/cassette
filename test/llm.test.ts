@@ -39,9 +39,11 @@ mock.module("openai", () => {
 
   class APIError extends Error {
     status: number;
-    constructor(status: number, message: string) {
+    headers: Headers | undefined;
+    constructor(status: number, message: string, _error?: unknown, headers?: Headers) {
       super(message);
       this.status = status;
+      this.headers = headers;
       this.name = "APIError";
     }
   }
@@ -299,9 +301,7 @@ describe("generate - retry behavior", () => {
     chatCreateFn = () => {
       callCount++;
       if (callCount === 1) {
-        const err = new APIError(429, "rate limited");
-        (err as APIError & { headers: Record<string, string> }).headers = { "retry-after": "5" };
-        throw err;
+        throw new APIError(429, "rate limited", undefined, new Headers({ "retry-after": "5" }));
       }
       return Promise.resolve({
         choices: [{ message: { content: "success" }, finish_reason: "stop" }],
@@ -322,9 +322,7 @@ describe("generate - retry behavior", () => {
     chatCreateFn = () => {
       callCount++;
       if (callCount === 1) {
-        const err = new APIError(429, "rate limited");
-        (err as APIError & { headers: Record<string, string> }).headers = { "retry-after-ms": "3000" };
-        throw err;
+        throw new APIError(429, "rate limited", undefined, new Headers({ "retry-after-ms": "3000" }));
       }
       return Promise.resolve({
         choices: [{ message: { content: "success" }, finish_reason: "stop" }],
@@ -345,12 +343,12 @@ describe("generate - retry behavior", () => {
     chatCreateFn = () => {
       callCount++;
       if (callCount === 1) {
-        const err = new APIError(429, "rate limited");
-        (err as APIError & { headers: Record<string, string> }).headers = {
-          "retry-after": "10",
-          "retry-after-ms": "2000",
-        };
-        throw err;
+        throw new APIError(
+          429,
+          "rate limited",
+          undefined,
+          new Headers({ "retry-after": "10", "retry-after-ms": "2000" }),
+        );
       }
       return Promise.resolve({
         choices: [{ message: { content: "success" }, finish_reason: "stop" }],
@@ -392,11 +390,12 @@ describe("generate - retry behavior", () => {
     chatCreateFn = () => {
       callCount++;
       if (callCount === 1) {
-        const err = new APIError(429, "rate limited");
-        (err as APIError & { headers: Record<string, string> }).headers = {
-          "retry-after": "not-a-number",
-        };
-        throw err;
+        throw new APIError(
+          429,
+          "rate limited",
+          undefined,
+          new Headers({ "retry-after": "not-a-number" }),
+        );
       }
       return Promise.resolve({
         choices: [{ message: { content: "success" }, finish_reason: "stop" }],

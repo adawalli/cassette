@@ -137,8 +137,10 @@ export function createOpenAILlmClient(env: NodeJS.ProcessEnv = process.env): Llm
             return;
           }
           if (error instanceof APIError) {
-            const rawMs = Number(error.headers?.["retry-after-ms"]);
-            const rawSeconds = Number(error.headers?.["retry-after"]);
+            const retryAfterMsHeader = error.headers?.get("retry-after-ms");
+            const retryAfterHeader = error.headers?.get("retry-after");
+            const rawMs = retryAfterMsHeader != null ? Number(retryAfterMsHeader) : NaN;
+            const rawSeconds = retryAfterHeader != null ? Number(retryAfterHeader) : NaN;
             const serverWaitMs = Number.isFinite(rawMs) && rawMs >= 0
               ? rawMs
               : Number.isFinite(rawSeconds) && rawSeconds >= 0
