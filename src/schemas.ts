@@ -25,7 +25,8 @@ export const LlmConfigSchema = z.object({
   temperature: z.number().min(0).max(2).default(0.1),
   max_tokens: z.number().int().positive().default(4000),
   timeout_ms: z.number().int().positive().default(120000),
-  retries: z.number().int().min(0).default(3),
+  retries: z.number().int().min(0).default(5),
+  retry_delay_ms: z.number().int().min(0).default(5000),
 });
 
 export const TranscriptConfigSchema = z.object({
