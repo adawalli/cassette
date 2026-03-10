@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.1](https://github.com/adawalli/cassette/compare/v0.4.0...v0.4.1) (2026-03-10)
+
+
+### Bug Fixes
+
+* honor retry-after headers and use exponential backoff for LLM rate limits ([80c3fc4](https://github.com/adawalli/cassette/commit/80c3fc4833acae34d12e5585fd6773cbf8e7d26f))
+* skip sleep on exhausted retries and handle malformed retry-after headers ([7f59eec](https://github.com/adawalli/cassette/commit/7f59eecab93d707c373a5258b0e4d6d31f6a973b))
+* use Headers.get() for retry-after header access ([fb0c88d](https://github.com/adawalli/cassette/commit/fb0c88d756b6e83e0257b9c5ee9fb125f145856e))
+
 ## [0.4.0](https://github.com/adawalli/cassette/compare/v0.3.2...v0.4.0) (2026-03-09)
 
 
