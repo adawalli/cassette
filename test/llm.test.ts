@@ -366,6 +366,52 @@ describe("generate - retry behavior", () => {
     expect(sleepCalls[0]).toBeLessThan(10000);
   });
 
+  test("does not sleep when retries are exhausted (retriesLeft === 0)", async () => {
+    const { RateLimitError } = await import("openai");
+    let callCount = 0;
+
+    chatCreateFn = () => {
+      callCount++;
+      throw new RateLimitError("still rate limited");
+    };
+
+    const client = createOpenAILlmClient({ OPENAI_API_KEY: "sk-test" });
+    await expect(
+      client.generate("prompt", "input", baseLlmConfig({ retries: 2, retry_delay_ms: 100 })),
+    ).rejects.toThrow("still rate limited");
+
+    expect(callCount).toBe(3); // 1 initial + 2 retries
+    // Should only sleep before retries that will actually happen (2 sleeps, not 3)
+    expect(sleepCalls).toHaveLength(2);
+  });
+
+  test("falls back to backoff when retry-after header is malformed", async () => {
+    const { APIError } = await import("openai");
+    let callCount = 0;
+
+    chatCreateFn = () => {
+      callCount++;
+      if (callCount === 1) {
+        const err = new APIError(429, "rate limited");
+        (err as APIError & { headers: Record<string, string> }).headers = {
+          "retry-after": "not-a-number",
+        };
+        throw err;
+      }
+      return Promise.resolve({
+        choices: [{ message: { content: "success" }, finish_reason: "stop" }],
+      });
+    };
+
+    const client = createOpenAILlmClient({ OPENAI_API_KEY: "sk-test" });
+    await client.generate("prompt", "input", baseLlmConfig({ retries: 2, retry_delay_ms: 100 }));
+
+    expect(sleepCalls).toHaveLength(1);
+    // Should use backoff (100ms * 2^0 * [1,2) = [100, 200)), not NaN
+    expect(sleepCalls[0]).toBeGreaterThanOrEqual(100);
+    expect(sleepCalls[0]).toBeLessThan(200);
+  });
+
   test("falls back to exponential backoff when no retry-after header", async () => {
     const { RateLimitError } = await import("openai");
     let callCount = 0;

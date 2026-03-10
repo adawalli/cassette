@@ -133,13 +133,16 @@ export function createOpenAILlmClient(env: NodeJS.ProcessEnv = process.env): Llm
           if (!isRetryable(error)) {
             throw new AbortError(error as Error);
           }
+          if (retriesLeft === 0) {
+            return;
+          }
           if (error instanceof APIError) {
-            const retryAfterMs = error.headers?.["retry-after-ms"];
-            const retryAfter = error.headers?.["retry-after"];
-            const serverWaitMs = retryAfterMs
-              ? Number(retryAfterMs)
-              : retryAfter
-                ? Number(retryAfter) * 1000
+            const rawMs = Number(error.headers?.["retry-after-ms"]);
+            const rawSeconds = Number(error.headers?.["retry-after"]);
+            const serverWaitMs = Number.isFinite(rawMs) && rawMs >= 0
+              ? rawMs
+              : Number.isFinite(rawSeconds) && rawSeconds >= 0
+                ? rawSeconds * 1000
                 : 0;
             const backoffMs = llmConfig.retry_delay_ms * Math.pow(2, attemptNumber - 1) * (1 + Math.random());
             const waitMs = Math.max(serverWaitMs, backoffMs);
