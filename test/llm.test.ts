@@ -358,9 +358,10 @@ describe("generate - retry behavior", () => {
     };
 
     const client = createOpenAILlmClient({ OPENAI_API_KEY: "sk-test" });
-    await client.generate("prompt", "input", baseLlmConfig({ retries: 2 }));
+    await client.generate("prompt", "input", baseLlmConfig({ retries: 2, retry_delay_ms: 0 }));
 
     // retry-after-ms (2000ms) takes priority over retry-after (10s = 10000ms)
+    // retry_delay_ms: 0 keeps backoff at zero so only server headers determine wait time
     expect(sleepCalls[0]).toBeGreaterThanOrEqual(2000);
     expect(sleepCalls[0]).toBeLessThan(10000);
   });
