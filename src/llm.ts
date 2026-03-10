@@ -1,6 +1,8 @@
 import OpenAI, { APIConnectionError, APIError, RateLimitError } from "openai";
 import pRetry, { AbortError } from "p-retry";
+import { logger } from "./logger";
 import { EnvSchema, type LlmConfig } from "./schemas";
+import { sleep } from "./stable-wait";
 
 export interface LlmClient {
   generate(prompt: string, transcriptText: string, llmConfig: LlmConfig): Promise<string>;
@@ -125,10 +127,26 @@ export function createOpenAILlmClient(env: NodeJS.ProcessEnv = process.env): Llm
 
       return pRetry(runRequest, {
         retries: llmConfig.retries,
+        minTimeout: 0,
         shouldRetry: ({ error }) => isRetryable(error),
-        onFailedAttempt: ({ error }) => {
+        onFailedAttempt: async ({ error, attemptNumber, retriesLeft }) => {
           if (!isRetryable(error)) {
             throw new AbortError(error as Error);
+          }
+          if (error instanceof APIError) {
+            const retryAfterMs = error.headers?.["retry-after-ms"];
+            const retryAfter = error.headers?.["retry-after"];
+            const serverWaitMs = retryAfterMs
+              ? Number(retryAfterMs)
+              : retryAfter
+                ? Number(retryAfter) * 1000
+                : 0;
+            const backoffMs = llmConfig.retry_delay_ms * Math.pow(2, attemptNumber - 1) * (1 + Math.random());
+            const waitMs = Math.max(serverWaitMs, backoffMs);
+            logger.debug(
+              `LLM rate limit hit, will retry: status=${error.status}, attempt=${attemptNumber}, retriesLeft=${retriesLeft}, waitMs=${Math.round(waitMs)}`,
+            );
+            await sleep(waitMs);
           }
         },
       });

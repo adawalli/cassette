@@ -60,7 +60,7 @@ describe("loadConfig", () => {
     expect(config.watch.stable_window_ms).toBe(3000);
     expect(config.output.markdown_suffix).toBe(".md");
     expect(config.failure.failed_dir_name).toBe("_failed");
-    expect(config.llm.retries).toBe(3);
+    expect(config.llm.retries).toBe(5);
   });
 
   test("throws on invalid schema", async () => {
