@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { intakeFile, scanIntakeFiles, startIntakeWatcher, weekDir } from "../src/intake";
+import { intakeFile, executeIntake, startIntakeWatcher, weekDir } from "../src/intake";
 import { IntakeConfigSchema, TranscriberConfigSchema } from "../src/schemas";
 import type { ResolvedTranscriberConfig } from "../src/schemas";
 import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
@@ -105,7 +105,7 @@ describe("intakeFile", () => {
   });
 });
 
-describe("scanIntakeFiles", () => {
+describe("executeIntake", () => {
   test("only moves files matching include_glob", async () => {
     const sourceDir = await makeTempDir();
     const rootDir = await makeTempDir();
@@ -114,7 +114,7 @@ describe("scanIntakeFiles", () => {
     await writeFile(path.join(sourceDir, "notes.txt"), "notes", "utf8");
 
     const cfg = intakeConfig(rootDir, sourceDir);
-    const results = await scanIntakeFiles(cfg);
+    const results = await executeIntake(cfg);
 
     expect(results).toHaveLength(1);
     expect(relFromRoot(rootDir, results[0]!)).toMatch(/^\d{4}\/\d{2}-\d{2}\/meeting\.vtt$/);
@@ -131,7 +131,7 @@ describe("scanIntakeFiles", () => {
     await writeFile(path.join(sourceDir, "archive", "old.vtt"), "WEBVTT\n\nold", "utf8");
 
     const cfg = intakeConfig(rootDir, sourceDir, { exclude_glob: ["archive/**"] });
-    const results = await scanIntakeFiles(cfg);
+    const results = await executeIntake(cfg);
 
     expect(results).toHaveLength(1);
     expect(relFromRoot(rootDir, results[0]!)).toMatch(/^\d{4}\/\d{2}-\d{2}\/meeting\.vtt$/);
@@ -181,7 +181,7 @@ describe("createIntakeFilter - file outside source_dir", () => {
     await writeFile(path.join(sourceDir, "inside.vtt"), "WEBVTT\n\nhello", "utf8");
 
     const cfg = intakeConfig(rootDir, sourceDir);
-    const results = await scanIntakeFiles(cfg);
+    const results = await executeIntake(cfg);
 
     // Only the file inside source_dir should be intaked
     expect(results).toHaveLength(1);
