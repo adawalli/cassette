@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { processTranscriptFile, waitForStableFile } from "../src/processor";
+import { processTranscriptFile } from "../src/processor";
+import { waitForStableFile } from "../src/stable-wait";
 import type { LlmClient } from "../src/llm";
 import type { ResolvedTranscriberConfig } from "../src/schemas";
 import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";

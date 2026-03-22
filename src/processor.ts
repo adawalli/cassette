@@ -13,8 +13,6 @@ import {
   type StepResult,
 } from "./schemas";
 
-export { waitForStableFile };
-
 type ProcessorDeps = {
   llmClient: LlmClient;
   now?: () => Date;
@@ -176,6 +174,7 @@ export async function processTranscriptFile(
     let currentInput = `Recording date: ${recordingDate}\n\n${renderTranscript(units)}`;
     logger.debug(`rendered transcript chars: ${currentInput.length}`);
 
+    const multiStep = steps.length > 1;
     const stepResults: StepResult[] = [];
 
     for (let i = 0; i < steps.length; i++) {
@@ -201,7 +200,7 @@ export async function processTranscriptFile(
         logger.debug(`step "${step.name}" wrote output: ${outPath}`);
       }
 
-      const warnings = steps.length === 1 ? collectMarkdownWarnings(stepOutput) : [];
+      const warnings = multiStep ? [] : collectMarkdownWarnings(stepOutput);
       if (warnings.length > 0) {
         logger.debug(`step "${step.name}" warnings: ${warnings.join(" | ")}`);
       }
@@ -221,8 +220,8 @@ export async function processTranscriptFile(
     return ProcessingResultSchema.parse({
       status: "success",
       markdownPath: lastStep.markdownPath,
-      warnings: steps.length > 1 ? [] : lastStep.warnings,
-      stepResults: steps.length > 1 ? stepResults : undefined,
+      warnings: multiStep ? [] : lastStep.warnings,
+      stepResults: multiStep ? stepResults : undefined,
     });
   } catch (error) {
     const failedStep = steps[currentStepIndex]?.name;

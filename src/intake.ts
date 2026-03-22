@@ -3,13 +3,9 @@ import { watch } from "node:fs";
 import path from "node:path";
 import picomatch from "picomatch";
 import { logger } from "./logger";
-import { exists } from "./paths";
-import { waitForStableFile } from "./processor";
+import { exists, normalizeForGlob } from "./paths";
+import { waitForStableFile } from "./stable-wait";
 import type { ResolvedTranscriberConfig } from "./schemas";
-
-function normalizeForGlob(filePath: string): string {
-  return filePath.split(path.sep).join("/");
-}
 
 export function weekDir(now: Date): string {
   const day = now.getDay();
@@ -25,7 +21,9 @@ export function weekDir(now: Date): string {
 async function moveFile(src: string, dest: string): Promise<void> {
   try {
     await rename(src, dest);
-  } catch {
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EXDEV") throw err;
+    // rename fails across filesystems (EXDEV); fall back to copy + delete
     await copyFile(src, dest);
     await unlink(src);
   }
@@ -89,7 +87,7 @@ export async function intakeFile(
   return destPath;
 }
 
-export async function scanIntakeFiles(config: ResolvedTranscriberConfig): Promise<string[]> {
+export async function executeIntake(config: ResolvedTranscriberConfig): Promise<string[]> {
   const sourceDir = config.intake!.source_dir;
   const shouldIntake = createIntakeFilter(config);
   const results: string[] = [];
@@ -113,10 +111,13 @@ export async function scanIntakeFiles(config: ResolvedTranscriberConfig): Promis
   return results;
 }
 
-export function startIntakeWatcher(
-  config: ResolvedTranscriberConfig,
-  onIntake: (destPath: string) => void,
-): () => void {
+export type IntakeWatcherOptions = {
+  config: ResolvedTranscriberConfig;
+  onIntake: (destPath: string) => void;
+};
+
+export function startIntakeWatcher(options: IntakeWatcherOptions): () => void {
+  const { config, onIntake } = options;
   const sourceDir = config.intake!.source_dir;
   const shouldIntake = createIntakeFilter(config);
   const inflight = new Set<string>();
@@ -134,14 +135,18 @@ export function startIntakeWatcher(
         return;
       }
       inflight.add(fullPath);
-      intakeFile(fullPath, config)
-        .then((destPath) => onIntake(destPath))
-        .catch((err) => {
+      (async () => {
+        try {
+          const destPath = await intakeFile(fullPath, config);
+          onIntake(destPath);
+        } catch (err) {
           if (!(err instanceof FileGoneError)) {
             logger.error(`[intake] watcher error for ${fullPath}: ${err}`);
           }
-        })
-        .finally(() => inflight.delete(fullPath));
+        } finally {
+          inflight.delete(fullPath);
+        }
+      })();
     },
   );
 

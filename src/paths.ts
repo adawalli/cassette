@@ -4,12 +4,19 @@ import path from "node:path";
 
 export const SUPPORTED_EXTENSIONS = new Set([".json", ".vtt"]);
 
+export function normalizeForGlob(filePath: string): string {
+  return filePath.split(path.sep).join("/");
+}
+
 export async function exists(filePath: string): Promise<boolean> {
   try {
     await stat(filePath);
     return true;
-  } catch {
-    return false;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return false;
+    }
+    throw err;
   }
 }
 

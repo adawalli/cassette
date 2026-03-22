@@ -3,6 +3,8 @@
 [![npm version](https://img.shields.io/npm/v/@cassette-meetings/cli)](https://www.npmjs.com/package/@cassette-meetings/cli)
 [![Coverage](https://codecov.io/gh/adawalli/cassette/graph/badge.svg)](https://codecov.io/gh/adawalli/cassette)
 
+<img src="scorecard.png" width="100%">
+
 Automatically watches a meeting transcript directory for JSON and VTT files, sends transcript content to an OpenAI-compatible endpoint, and writes cleaned Markdown next to each input file.
 
 ## Flow

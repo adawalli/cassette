@@ -2,7 +2,7 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { createFileFilter } from "./file-filter";
 import { runOnCompleteHook } from "./hooks";
-import { scanIntakeFiles, startIntakeWatcher } from "./intake";
+import { executeIntake, startIntakeWatcher } from "./intake";
 import type { LlmClient } from "./llm";
 import { logger } from "./logger";
 import { isInFailedDirectory } from "./paths";
@@ -112,7 +112,7 @@ export async function runBackfill(
   deps: ServiceDeps,
 ): Promise<void> {
   if (config.intake) {
-    await scanIntakeFiles(config);
+    await executeIntake(config);
   }
   const queue = new SerialQueue();
   const files = await scanInputFiles(config);
@@ -156,7 +156,7 @@ export async function runService(
   };
 
   if (config.intake) {
-    const intakeFiles = await scanIntakeFiles(config);
+    const intakeFiles = await executeIntake(config);
     for (const filePath of intakeFiles) {
       enqueuePath(filePath);
     }
@@ -173,7 +173,7 @@ export async function runService(
   });
 
   if (config.intake) {
-    const stopIntakeWatcher = startIntakeWatcher(config, enqueuePath);
+    const stopIntakeWatcher = startIntakeWatcher({ config, onIntake: enqueuePath });
     return () => {
       stopIntakeWatcher();
       stopMainWatcher();
