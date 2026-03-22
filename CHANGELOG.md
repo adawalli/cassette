@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.2](https://github.com/adawalli/cassette/compare/v0.4.1...v0.4.2) (2026-03-22)
+
+
+### Bug Fixes
+
+* add skipDir to walkDirectory and prune failed dir at traversal time ([3dc116d](https://github.com/adawalli/cassette/commit/3dc116d2e9a766ccd81040d2c1283a1d96510c85))
+* consolidate path utils and fix module boundaries ([de2495f](https://github.com/adawalli/cassette/commit/de2495f59c7f6f277cc3291693d0314d592260ec))
+* correct moveFile bare catch and executeIntake naming ([c3c0664](https://github.com/adawalli/cassette/commit/c3c06646013bcfbc33803439ced224a9706f4460))
+* re-throw non-EXDEV rename errors in moveFile ([26fcb30](https://github.com/adawalli/cassette/commit/26fcb30fd76fcdfd765e33bdf59e530de20e62f8))
+
 ## [0.4.1](https://github.com/adawalli/cassette/compare/v0.4.0...v0.4.1) (2026-03-10)
 
 
