@@ -173,7 +173,7 @@ export async function runService(
   });
 
   if (config.intake) {
-    const stopIntakeWatcher = startIntakeWatcher(config, enqueuePath);
+    const stopIntakeWatcher = startIntakeWatcher({ config, onIntake: enqueuePath });
     return () => {
       stopIntakeWatcher();
       stopMainWatcher();

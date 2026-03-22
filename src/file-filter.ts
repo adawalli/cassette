@@ -1,11 +1,7 @@
 import path from "node:path";
 import picomatch from "picomatch";
-import { SUPPORTED_EXTENSIONS } from "./paths";
+import { normalizeForGlob, SUPPORTED_EXTENSIONS } from "./paths";
 import type { TranscriberConfig } from "./schemas";
-
-function normalizeForGlob(filePath: string): string {
-  return filePath.split(path.sep).join("/");
-}
 
 export function createFileFilter(config: TranscriberConfig): (filePath: string) => boolean {
   const includeMatcher = picomatch(config.watch.include_glob);

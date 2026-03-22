@@ -3,6 +3,7 @@ import { logger } from "./logger";
 export class SerialQueue {
   private chain: Promise<void> = Promise.resolve();
 
+  /** Schedules a task. Task errors are caught and logged so the queue never stalls - callers cannot observe individual task failures. */
   enqueue(task: () => Promise<void>): void {
     this.chain = this.chain.then(task).catch((error) => {
       logger.error(

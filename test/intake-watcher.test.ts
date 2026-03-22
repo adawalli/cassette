@@ -18,13 +18,9 @@ mock.module("node:fs", () => ({
   },
 }));
 
-// Import real processor first so all its exports survive in the mock.
-// Without this spread, mock.module strips processTranscriptFile and breaks
-// processor.test.ts when bun runs files alphabetically (intake-watcher before processor).
-const realProcessor = await import("../src/processor");
-mock.module("../src/processor", () => ({
-  ...realProcessor,
+mock.module("../src/stable-wait", () => ({
   waitForStableFile: async () => {},
+  sleep: async () => {},
 }));
 
 // Dynamic import after mocks are set up
@@ -58,7 +54,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "call.vtt"), "WEBVTT\n\nhello", "utf8");
 
     const intaked: string[] = [];
-    startIntakeWatcher(cfg, (destPath) => intaked.push(destPath));
+    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
 
     capturedListener("rename", "call.vtt");
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -73,7 +69,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     const cfg = intakeWatcherConfig(rootDir, sourceDir);
 
     const intaked: string[] = [];
-    startIntakeWatcher(cfg, (destPath) => intaked.push(destPath));
+    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
 
     capturedListener("rename", null as unknown as string);
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -89,7 +85,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "notes.txt"), "hello", "utf8");
 
     const intaked: string[] = [];
-    startIntakeWatcher(cfg, (destPath) => intaked.push(destPath));
+    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
 
     capturedListener("rename", "notes.txt");
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -105,7 +101,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "dup.vtt"), "WEBVTT\n\nhello", "utf8");
 
     const intaked: string[] = [];
-    startIntakeWatcher(cfg, (destPath) => intaked.push(destPath));
+    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
 
     capturedListener("rename", "dup.vtt");
     capturedListener("rename", "dup.vtt");
@@ -122,7 +118,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     const cfg = intakeWatcherConfig(rootDir, sourceDir);
 
     const intaked: string[] = [];
-    startIntakeWatcher(cfg, (destPath) => intaked.push(destPath));
+    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
 
     capturedListener("rename", "ghost.vtt");
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -136,7 +132,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     const cfg = intakeWatcherConfig(rootDir, sourceDir);
 
     const intaked: string[] = [];
-    startIntakeWatcher(cfg, (destPath) => intaked.push(destPath));
+    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
 
     // File does not exist -> FileGoneError which is silently caught
     capturedListener("rename", "nonexistent.vtt");
@@ -158,8 +154,11 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "exists.vtt"), "WEBVTT\n\nhello", "utf8");
 
     const errorSpy = spyOn(logger, "error").mockImplementation(() => {});
-    const stop = startIntakeWatcher(cfg, () => {
-      throw new Error("downstream failure");
+    const stop = startIntakeWatcher({
+      config: cfg,
+      onIntake: () => {
+        throw new Error("downstream failure");
+      },
     });
     try {
       capturedListener("rename", "exists.vtt");
@@ -180,7 +179,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "buffer.vtt"), "WEBVTT\n\nhello", "utf8");
 
     const intaked: string[] = [];
-    startIntakeWatcher(cfg, (destPath) => intaked.push(destPath));
+    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
 
     capturedListener("rename", Buffer.from("buffer.vtt") as unknown as string);
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -194,7 +193,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     const sourceDir = await makeTempDir();
     const rootDir = await makeTempDir();
     const cfg = intakeWatcherConfig(rootDir, sourceDir);
-    const stop = startIntakeWatcher(cfg, () => {});
+    const stop = startIntakeWatcher({ config: cfg, onIntake: () => {} });
 
     expect(fakeClose).not.toHaveBeenCalled();
     stop();

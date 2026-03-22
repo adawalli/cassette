@@ -5,6 +5,7 @@ import { EnvSchema, type LlmConfig } from "./schemas";
 import { sleep } from "./stable-wait";
 
 export interface LlmClient {
+  /** Generates a response from the LLM. Throws on permanent failures (non-retryable API errors, auth failures). */
   generate(prompt: string, transcriptText: string, llmConfig: LlmConfig): Promise<string>;
 }
 
@@ -141,12 +142,14 @@ export function createOpenAILlmClient(env: NodeJS.ProcessEnv = process.env): Llm
             const retryAfterHeader = error.headers?.get("retry-after");
             const rawMs = retryAfterMsHeader != null ? Number(retryAfterMsHeader) : NaN;
             const rawSeconds = retryAfterHeader != null ? Number(retryAfterHeader) : NaN;
-            const serverWaitMs = Number.isFinite(rawMs) && rawMs >= 0
-              ? rawMs
-              : Number.isFinite(rawSeconds) && rawSeconds >= 0
-                ? rawSeconds * 1000
-                : 0;
-            const backoffMs = llmConfig.retry_delay_ms * Math.pow(2, attemptNumber - 1) * (1 + Math.random());
+            const serverWaitMs =
+              Number.isFinite(rawMs) && rawMs >= 0
+                ? rawMs
+                : Number.isFinite(rawSeconds) && rawSeconds >= 0
+                  ? rawSeconds * 1000
+                  : 0;
+            const backoffMs =
+              llmConfig.retry_delay_ms * Math.pow(2, attemptNumber - 1) * (1 + Math.random());
             const waitMs = Math.max(serverWaitMs, backoffMs);
             logger.debug(
               `LLM rate limit hit, will retry: status=${error.status}, attempt=${attemptNumber}, retriesLeft=${retriesLeft}, waitMs=${Math.round(waitMs)}`,

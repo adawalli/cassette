@@ -195,7 +195,7 @@ describe("startIntakeWatcher", () => {
     const rootDir = await makeTempDir();
     const cfg = intakeConfig(rootDir, sourceDir);
 
-    const stop = startIntakeWatcher(cfg, () => {});
+    const stop = startIntakeWatcher({ config: cfg, onIntake: () => {} });
     expect(typeof stop).toBe("function");
     stop();
   });
@@ -207,7 +207,7 @@ describe("startIntakeWatcher", () => {
 
     // Ensure the watcher can be created and torn down without errors
     const intaked: string[] = [];
-    const stop = startIntakeWatcher(cfg, (p) => intaked.push(p));
+    const stop = startIntakeWatcher({ config: cfg, onIntake: (p) => intaked.push(p) });
     // Immediately stop - verifies initialization code runs without error
     stop();
   });
