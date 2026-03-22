@@ -21,7 +21,8 @@ export function weekDir(now: Date): string {
 async function moveFile(src: string, dest: string): Promise<void> {
   try {
     await rename(src, dest);
-  } catch {
+  } catch (_err) {
+    // rename fails across filesystems (EXDEV); fall back to copy + delete
     await copyFile(src, dest);
     await unlink(src);
   }
@@ -85,7 +86,7 @@ export async function intakeFile(
   return destPath;
 }
 
-export async function scanIntakeFiles(config: ResolvedTranscriberConfig): Promise<string[]> {
+export async function executeIntake(config: ResolvedTranscriberConfig): Promise<string[]> {
   const sourceDir = config.intake!.source_dir;
   const shouldIntake = createIntakeFilter(config);
   const results: string[] = [];
