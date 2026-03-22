@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -8,12 +8,21 @@ export function normalizeForGlob(filePath: string): string {
   return filePath.split(path.sep).join("/");
 }
 
+export function isEnoent(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "ENOENT"
+  );
+}
+
 export async function exists(filePath: string): Promise<boolean> {
   try {
     await stat(filePath);
     return true;
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+    if (isEnoent(err)) {
       return false;
     }
     throw err;
@@ -46,4 +55,29 @@ export function isVttPath(filePath: string): boolean {
 export function isInFailedDirectory(filePath: string, failedDirName: string): boolean {
   const segments = filePath.split(path.sep);
   return segments.includes(failedDirName);
+}
+
+export async function walkDirectory(
+  dir: string,
+  filter: (filePath: string) => boolean,
+  skipDir?: (dirPath: string) => boolean,
+): Promise<string[]> {
+  const results: string[] = [];
+
+  async function walk(current: string): Promise<void> {
+    const entries = await readdir(current, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (!skipDir || !skipDir(full)) {
+          await walk(full);
+        }
+      } else if (entry.isFile() && filter(full)) {
+        results.push(full);
+      }
+    }
+  }
+
+  await walk(dir);
+  return results;
 }

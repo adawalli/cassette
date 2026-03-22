@@ -2,6 +2,7 @@ import pkg from "../package.json";
 import { initConfigFile, loadConfig, resolveConfigPath } from "./config";
 import { createOpenAILlmClient } from "./llm";
 import { logger } from "./logger";
+import { isEnoent } from "./paths";
 import { runBackfill, runService } from "./service";
 
 const VERSION = pkg.version;
@@ -106,12 +107,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   try {
     config = await loadConfig(args.configPath);
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { code?: string }).code === "ENOENT"
-    ) {
+    if (isEnoent(error)) {
       throw new Error(
         `Config not found at ${resolvedConfigPath}. Run 'bun run index.ts init' to create one.`,
       );

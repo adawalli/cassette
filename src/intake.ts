@@ -1,9 +1,9 @@
-import { copyFile, mkdir, readdir, rename, unlink } from "node:fs/promises";
+import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
 import { watch } from "node:fs";
 import path from "node:path";
-import picomatch from "picomatch";
+import { createGlobFilter } from "./file-filter";
 import { logger } from "./logger";
-import { exists, normalizeForGlob } from "./paths";
+import { exists, walkDirectory } from "./paths";
 import { waitForStableFile } from "./stable-wait";
 import type { ResolvedTranscriberConfig } from "./schemas";
 
@@ -37,23 +37,11 @@ class FileGoneError extends Error {
 
 function createIntakeFilter(config: ResolvedTranscriberConfig): (filePath: string) => boolean {
   const intake = config.intake!;
-  const includeMatcher = picomatch(intake.include_glob);
-  const excludeMatchers = intake.exclude_glob.map((p) => picomatch(p));
-
-  return (filePath: string): boolean => {
-    const relative = path.relative(intake.source_dir, filePath);
-    if (!relative || relative.startsWith("..")) {
-      return false;
-    }
-    const normalized = normalizeForGlob(relative);
-    if (!includeMatcher(normalized)) {
-      return false;
-    }
-    if (excludeMatchers.some((m) => m(normalized))) {
-      return false;
-    }
-    return true;
-  };
+  return createGlobFilter({
+    baseDir: intake.source_dir,
+    includeGlob: intake.include_glob,
+    excludeGlobs: intake.exclude_glob,
+  });
 }
 
 export async function intakeFile(
@@ -90,24 +78,13 @@ export async function intakeFile(
 export async function executeIntake(config: ResolvedTranscriberConfig): Promise<string[]> {
   const sourceDir = config.intake!.source_dir;
   const shouldIntake = createIntakeFilter(config);
+
+  const matchedFiles = await walkDirectory(sourceDir, shouldIntake);
   const results: string[] = [];
-
-  async function walk(dir: string): Promise<void> {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        await walk(full);
-        continue;
-      }
-      if (entry.isFile() && shouldIntake(full)) {
-        const destPath = await intakeFile(full, config);
-        results.push(destPath);
-      }
-    }
+  for (const filePath of matchedFiles) {
+    const destPath = await intakeFile(filePath, config);
+    results.push(destPath);
   }
-
-  await walk(sourceDir);
   return results;
 }
 

@@ -1,8 +1,8 @@
 import OpenAI, { APIConnectionError, APIError, RateLimitError } from "openai";
-import pRetry, { AbortError } from "p-retry";
+import pRetry from "p-retry";
 import { logger } from "./logger";
 import { EnvSchema, type LlmConfig } from "./schemas";
-import { sleep } from "./stable-wait";
+import { sleep } from "./sleep";
 
 export interface LlmClient {
   /** Generates a response from the LLM. Throws on permanent failures (non-retryable API errors, auth failures). */
@@ -131,9 +131,6 @@ export function createOpenAILlmClient(env: NodeJS.ProcessEnv = process.env): Llm
         minTimeout: 0,
         shouldRetry: ({ error }) => isRetryable(error),
         onFailedAttempt: async ({ error, attemptNumber, retriesLeft }) => {
-          if (!isRetryable(error)) {
-            throw new AbortError(error as Error);
-          }
           if (retriesLeft === 0) {
             return;
           }

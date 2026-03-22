@@ -6,12 +6,11 @@ let createArgs: Record<string, unknown>[] = [];
 let chatCreateFn: (...args: unknown[]) => Promise<unknown>;
 
 let sleepCalls: number[] = [];
-mock.module("../src/stable-wait", () => ({
+mock.module("../src/sleep", () => ({
   sleep: (ms: number) => {
     sleepCalls.push(ms);
     return Promise.resolve();
   },
-  waitForStableFile: () => Promise.resolve(),
 }));
 
 function defaultChatCreate() {
@@ -322,7 +321,12 @@ describe("generate - retry behavior", () => {
     chatCreateFn = () => {
       callCount++;
       if (callCount === 1) {
-        throw new APIError(429, "rate limited", undefined, new Headers({ "retry-after-ms": "3000" }));
+        throw new APIError(
+          429,
+          "rate limited",
+          undefined,
+          new Headers({ "retry-after-ms": "3000" }),
+        );
       }
       return Promise.resolve({
         choices: [{ message: { content: "success" }, finish_reason: "stop" }],

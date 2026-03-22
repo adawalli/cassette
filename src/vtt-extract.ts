@@ -57,32 +57,27 @@ export function extractVttTranscriptUnits(raw: string): TranscriptUnit[] {
   const merged: TranscriptUnit[] = [];
   let current: { speaker: string | undefined; text: string } | null = null;
 
+  function flushCurrent(): void {
+    if (current) {
+      merged.push(
+        TranscriptUnitSchema.parse({
+          speaker: current.speaker,
+          text: current.text,
+          index: merged.length,
+        }),
+      );
+    }
+  }
+
   for (const cue of cues) {
     if (current && current.speaker === cue.speaker) {
       current.text += " " + cue.text;
     } else {
-      if (current) {
-        merged.push(
-          TranscriptUnitSchema.parse({
-            speaker: current.speaker,
-            text: current.text,
-            index: merged.length,
-          }),
-        );
-      }
+      flushCurrent();
       current = { speaker: cue.speaker, text: cue.text };
     }
   }
-
-  if (current) {
-    merged.push(
-      TranscriptUnitSchema.parse({
-        speaker: current.speaker,
-        text: current.text,
-        index: merged.length,
-      }),
-    );
-  }
+  flushCurrent();
 
   return merged;
 }

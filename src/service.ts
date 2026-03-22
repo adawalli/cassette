@@ -1,11 +1,9 @@
-import { readdir } from "node:fs/promises";
-import path from "node:path";
 import { createFileFilter } from "./file-filter";
 import { runOnCompleteHook } from "./hooks";
 import { executeIntake, startIntakeWatcher } from "./intake";
 import type { LlmClient } from "./llm";
 import { logger } from "./logger";
-import { isInFailedDirectory } from "./paths";
+import { isInFailedDirectory, walkDirectory } from "./paths";
 import { processTranscriptFile } from "./processor";
 import { SerialQueue } from "./queue";
 import type { ProcessingResult, ResolvedTranscriberConfig } from "./schemas";
@@ -81,30 +79,12 @@ async function fireOnCompleteHooks(
 }
 
 export async function scanInputFiles(config: ResolvedTranscriberConfig): Promise<string[]> {
-  const results: string[] = [];
   const shouldProcess = createFileFilter(config);
-  const rootDir = config.watch.root_dir;
   const failedDirName = config.failure.failed_dir_name;
 
-  async function walk(dir: string): Promise<void> {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      if (isInFailedDirectory(full, failedDirName)) {
-        continue;
-      }
-      if (entry.isDirectory()) {
-        await walk(full);
-        continue;
-      }
-      if (entry.isFile() && shouldProcess(full)) {
-        results.push(full);
-      }
-    }
-  }
-
-  await walk(rootDir);
-  return results;
+  return walkDirectory(config.watch.root_dir, shouldProcess, (dirPath) =>
+    isInFailedDirectory(dirPath, failedDirName),
+  );
 }
 
 export async function runBackfill(
