@@ -21,7 +21,8 @@ export function weekDir(now: Date): string {
 async function moveFile(src: string, dest: string): Promise<void> {
   try {
     await rename(src, dest);
-  } catch (_err) {
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EXDEV") throw err;
     // rename fails across filesystems (EXDEV); fall back to copy + delete
     await copyFile(src, dest);
     await unlink(src);
