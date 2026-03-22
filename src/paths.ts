@@ -60,6 +60,7 @@ export function isInFailedDirectory(filePath: string, failedDirName: string): bo
 export async function walkDirectory(
   dir: string,
   filter: (filePath: string) => boolean,
+  skipDir?: (dirPath: string) => boolean,
 ): Promise<string[]> {
   const results: string[] = [];
 
@@ -68,7 +69,9 @@ export async function walkDirectory(
     for (const entry of entries) {
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
-        await walk(full);
+        if (!skipDir || !skipDir(full)) {
+          await walk(full);
+        }
       } else if (entry.isFile() && filter(full)) {
         results.push(full);
       }

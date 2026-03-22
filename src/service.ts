@@ -82,12 +82,9 @@ export async function scanInputFiles(config: ResolvedTranscriberConfig): Promise
   const shouldProcess = createFileFilter(config);
   const failedDirName = config.failure.failed_dir_name;
 
-  return walkDirectory(config.watch.root_dir, (filePath) => {
-    if (isInFailedDirectory(filePath, failedDirName)) {
-      return false;
-    }
-    return shouldProcess(filePath);
-  });
+  return walkDirectory(config.watch.root_dir, shouldProcess, (dirPath) =>
+    isInFailedDirectory(dirPath, failedDirName),
+  );
 }
 
 export async function runBackfill(
