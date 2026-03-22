@@ -1,8 +1,5 @@
 import { stat } from "node:fs/promises";
-
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+import { sleep } from "./sleep";
 
 export async function waitForStableFile(
   filePath: string,
