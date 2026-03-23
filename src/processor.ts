@@ -118,7 +118,7 @@ async function copyOutput(
     const trimmed = path.basename(sanitizeFilename(resolved)).slice(0, 200).trim();
     if (trimmed.length === 0) {
       destFilename = `${recordingDate} ${stem}.md`;
-    } else if (trimmed.endsWith(".md")) {
+    } else if (path.extname(trimmed).toLowerCase() === ".md") {
       destFilename = trimmed;
     } else {
       destFilename = `${trimmed}.md`;

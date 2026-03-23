@@ -699,6 +699,34 @@ describe("copy_filename template", () => {
     expect(await fileExists(path.join(vaultDir, "2026-03-20 Weekly Standup.md.md"))).toBe(false);
   });
 
+  test("template with .MD extension (case-insensitive) does not produce double extension", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{date}} {{title}}.MD"), {
+      llmClient: titledLlm,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 Weekly Standup.MD"))).toBe(true);
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 Weekly Standup.MD.md"))).toBe(false);
+  });
+
+  test("template resolving to all-invalid characters falls back to default naming", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    const llmClient: LlmClient = {
+      generate: async () => '---\ntitle: "***"\ndate: 2026-03-20\n---\n## Summary\nx',
+    };
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{title}}"), {
+      llmClient,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
+  });
+
   test("copy_filename without copy_to is silently accepted", () => {
     const result = OutputConfigSchema.safeParse({ copy_filename: "{{date}} {{title}}" });
     expect(result.success).toBe(true);
