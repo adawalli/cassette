@@ -59,22 +59,22 @@
 
 ## Phase 4: User Story 2 - Custom output filename via template (Priority: P2)
 
-**Goal**: Add optional `copy_filename` template field to output config. Support `{date}`, `{stem}`, `{title}` variables with title extracted from YAML front matter.
+**Goal**: Add optional `copy_filename` template field to output config. Support `{{date}}`, `{{stem}}`, `{{title}}` variables with title extracted from YAML front matter.
 
-**Independent Test**: Configure `copy_filename: "{date} {title}"`, process a transcript whose LLM output contains `title: Weekly Standup` in front matter, verify copied file is named `2026-03-20 Weekly Standup.md`.
+**Independent Test**: Configure `copy_filename: "{{date}} {{title}}"`, process a transcript whose LLM output contains `title: Weekly Standup` in front matter, verify copied file is named `2026-03-20 Weekly Standup.md`.
 
 ### Tests for User Story 2
 
 > **Write these tests FIRST, ensure they FAIL before implementation**
 
-- [x] T010 [P] [US2] Add test: `copy_filename` template with `{date} {title}` resolves correctly when front matter has title in test/processor.test.ts
-- [x] T011 [P] [US2] Add test: `{title}` falls back to `{stem}` when markdown has no front matter in test/processor.test.ts
-- [x] T012 [P] [US2] Add test: `{title}` falls back to `{stem}` when front matter exists but has no `title` field in test/processor.test.ts
-- [x] T013 [P] [US2] Add test: omitting `copy_filename` preserves default `{date} {stem}.md` naming in test/processor.test.ts
-- [x] T014 [P] [US2] Add test: config validation rejects `copy_filename` with unknown variables like `{foo}` in test/processor.test.ts
+- [x] T010 [P] [US2] Add test: `copy_filename` template with `{{date}} {{title}}` resolves correctly when front matter has title in test/processor.test.ts
+- [x] T011 [P] [US2] Add test: `{{title}}` falls back to `{{stem}}` when markdown has no front matter in test/processor.test.ts
+- [x] T012 [P] [US2] Add test: `{{title}}` falls back to `{{stem}}` when front matter exists but has no `title` field in test/processor.test.ts
+- [x] T013 [P] [US2] Add test: omitting `copy_filename` preserves default `{{date}} {{stem}}.md` naming in test/processor.test.ts
+- [x] T014 [P] [US2] Add test: config validation rejects `copy_filename` with unknown variables like `{{foo}}` in test/processor.test.ts
 - [x] T015 [P] [US2] Add test: config validation rejects empty `copy_filename` string in test/processor.test.ts
 - [x] T016 [P] [US2] Add test: resolved filename has filesystem-invalid characters replaced with `-` (e.g., `Q1: Planning` -> `Q1- Planning`) in test/processor.test.ts
-- [x] T016a [P] [US2] Add test: `{title}` falls back to `{stem}` when front matter has `title: ""` (empty string value) in test/processor.test.ts
+- [x] T016a [P] [US2] Add test: `{{title}}` falls back to `{{stem}}` when front matter has `title: ""` (empty string value) in test/processor.test.ts
 - [x] T016b [P] [US2] Add test: `copy_filename` set without `copy_to` is silently accepted (no validation error) in test/processor.test.ts
 - [x] T017 [US2] Run tests and verify T010-T016b FAIL (Red phase confirmation)
 
@@ -82,7 +82,7 @@
 
 - [x] T018 [US2] Add optional `copy_filename` string field to `OutputConfigSchema` with Zod `.refine()` validation for allowed variables in src/schemas.ts
 - [x] T019 [US2] Add `extractTitleFromMarkdown` function using `yaml` package to parse front matter title in src/processor.ts
-- [x] T020 [US2] Add `resolveTemplate` function with `replaceAll` for `{date}`, `{stem}`, `{title}` substitution in src/processor.ts
+- [x] T020 [US2] Add `resolveTemplate` function with `replaceAll` for `{{date}}`, `{{stem}}`, `{{title}}` substitution in src/processor.ts
 - [x] T021 [US2] Add `sanitizeFilename` function to replace filesystem-invalid characters with `-` in src/processor.ts
 - [x] T022 [US2] Integrate template resolution into `copyOutput`: resolve template, sanitize, append `.md` in src/processor.ts
 - [x] T023 [US2] Run tests and verify T010-T016b all PASS (Green phase confirmation)
@@ -95,15 +95,15 @@
 
 **Goal**: Verify and ensure template variables work in any order and combination.
 
-**Independent Test**: Configure `copy_filename: "{stem} - {date}"` and verify the output filename matches the pattern.
+**Independent Test**: Configure `copy_filename: "{{stem}} - {{date}}"` and verify the output filename matches the pattern.
 
 ### Tests for User Story 3
 
 > **Write these tests FIRST, ensure they FAIL before implementation**
 
-- [x] T024 [P] [US3] Add test: `copy_filename: "{stem} - {date}"` produces `weekly-standup - 2026-03-20.md` in test/processor.test.ts
-- [x] T025 [P] [US3] Add test: `copy_filename: "{title}"` (no date) produces `Weekly Standup.md` in test/processor.test.ts
-- [x] T026 [P] [US3] Add test: `copy_filename: "{date} {stem} {title}"` with stem `weekly-standup` and title `Weekly Standup` produces exactly `2026-03-20 weekly-standup Weekly Standup.md` in test/processor.test.ts
+- [x] T024 [P] [US3] Add test: `copy_filename: "{{stem}} - {{date}}"` produces `weekly-standup - 2026-03-20.md` in test/processor.test.ts
+- [x] T025 [P] [US3] Add test: `copy_filename: "{{title}}"` (no date) produces `Weekly Standup.md` in test/processor.test.ts
+- [x] T026 [P] [US3] Add test: `copy_filename: "{{date}} {{stem}} {{title}}"` with stem `weekly-standup` and title `Weekly Standup` produces exactly `2026-03-20 weekly-standup Weekly Standup.md` in test/processor.test.ts
 - [x] T027 [P] [US3] Add test: resolved filename that is only whitespace falls back to default naming in test/processor.test.ts
 - [x] T028 [US3] Run tests and verify new tests FAIL where implementation is missing (Red phase)
 
@@ -137,14 +137,14 @@
 - **Setup (Phase 1)**: No dependencies - verify current state
 - **Foundational (Phase 2)**: N/A - no blocking infrastructure needed
 - **US1 (Phase 3)**: Can start immediately after setup. BLOCKS US2 (template feature builds on correct `stripDateFromStem`)
-- **US2 (Phase 4)**: Depends on US1 completion (template `{stem}` uses the fixed `stripDateFromStem`)
+- **US2 (Phase 4)**: Depends on US1 completion (template `{{stem}}` uses the fixed `stripDateFromStem`)
 - **US3 (Phase 5)**: Depends on US2 completion (extends the template machinery)
 - **Polish (Phase 6)**: Depends on all user stories being complete
 
 ### User Story Dependencies
 
 - **US1 (P1)**: Independent - bug fix to existing function
-- **US2 (P2)**: Depends on US1 (correct stem extraction needed for `{stem}` variable)
+- **US2 (P2)**: Depends on US1 (correct stem extraction needed for `{{stem}}` variable)
 - **US3 (P3)**: Depends on US2 (extends template resolution with edge cases)
 
 ### Within Each User Story
@@ -166,8 +166,8 @@
 
 ```bash
 # Write all US2 tests in parallel (all in test/processor.test.ts but independent test cases):
-Task: "Add test: copy_filename template with {date} {title} resolves correctly"
-Task: "Add test: {title} falls back to {stem} when no front matter"
+Task: "Add test: copy_filename template with {{date}} {{title}} resolves correctly"
+Task: "Add test: {{title}} falls back to {{stem}} when no front matter"
 Task: "Add test: config validation rejects unknown variables"
 Task: "Add test: config validation rejects empty copy_filename"
 Task: "Add test: filesystem-invalid characters sanitized"
@@ -205,5 +205,5 @@ Task: "Integrate template resolution into copyOutput in src/processor.ts"
 | Step | Prefix | Description |
 |------|--------|-------------|
 | US1 | `fix:` | Strip underscore and hyphen separators after leading date in stripDateFromStem |
-| US2+US3 | `feat:` | Add copy_filename template with {date}, {stem}, {title} variables |
+| US2+US3 | `feat:` | Add copy_filename template with {{date}}, {{stem}}, {{title}} variables |
 | Polish | `docs:` | Document copy_filename template in README and config example |

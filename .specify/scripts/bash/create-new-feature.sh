@@ -39,6 +39,10 @@ while [ $i -le $# ]; do
                 echo 'Error: --number requires a value' >&2
                 exit 1
             fi
+            if ! echo "$next_arg" | grep -Eq '^[0-9]+$'; then
+                echo "Error: --number must be a positive integer" >&2
+                exit 1
+            fi
             BRANCH_NUMBER="$next_arg"
             ;;
         --timestamp)

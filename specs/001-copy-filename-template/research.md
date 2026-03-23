@@ -24,7 +24,7 @@
 
 ## R3: Template validation strategy
 
-**Decision**: Validate `copy_filename` at config load time in `src/schemas.ts` using a Zod `.refine()` on the `OutputConfigSchema`. Extract all `{{...}}` tokens from the template and reject any not in the allowed set (`date`, `stem`, `title`) using `{{var}}` double-brace syntax (consistent with `on_complete` command templates).
+**Decision**: Validate `copy_filename` at config load time in `src/schemas.ts` using a Zod `.superRefine()` on the `OutputConfigSchema`. Extract all `{{...}}` tokens from the template and reject any not in the allowed set (`date`, `stem`, `title`) using `{{var}}` double-brace syntax (consistent with `on_complete` command templates).
 
 **Rationale**: Fail-fast at config load prevents confusing runtime errors during file processing. Zod refinement keeps validation co-located with the schema definition, consistent with the existing codebase pattern.
 

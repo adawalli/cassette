@@ -18,7 +18,7 @@ export const OutputConfigSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.copy_filename === undefined) return;
-    const vars = [...data.copy_filename.matchAll(/\{\{([^{}]+)\}\}/g)].map((m) => m[1]!.trim());
+    const vars = [...data.copy_filename.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]!);
     const unknown = vars.filter((v) => !ALLOWED_TEMPLATE_VARS.has(v));
     if (unknown.length > 0) {
       ctx.addIssue({

@@ -71,7 +71,7 @@ A user wants to use different combinations of template variables to match their 
 - **FR-001**: `stripDateFromStem` MUST strip a leading date when followed by `_`, `-`, or whitespace (not just whitespace)
 - **FR-002**: `stripDateFromStem` MUST preserve existing behavior for space-separated dates (no regression)
 - **FR-003**: The `output` config section MUST accept an optional `copy_filename` string field
-- **FR-004**: When `copy_filename` is omitted, the copy naming behavior MUST remain unchanged (current `{date} {stem}.md` pattern)
+- **FR-004**: When `copy_filename` is omitted, the copy naming behavior MUST remain unchanged (current `{{date}} {{stem}}.md` pattern)
 - **FR-005**: The template MUST support three variables: `{{date}}`, `{{stem}}`, and `{{title}}`
 - **FR-006**: `{{date}}` MUST resolve to the recording date in `YYYY-MM-DD` format (already extracted from filename or birthtime)
 - **FR-007**: `{{stem}}` MUST resolve to the filename stem after `stripDateFromStem` processing (existing behavior)
