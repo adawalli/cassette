@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0](https://github.com/adawalli/cassette/compare/v0.4.2...v0.5.0) (2026-03-23)
+
+
+### Features
+
+* add copy_filename template and fix stripDateFromStem separators ([d860b66](https://github.com/adawalli/cassette/commit/d860b6654eb74f9214741d4a38fa557486adab83))
+* add copy_filename template and fix stripDateFromStem separators ([a098a15](https://github.com/adawalli/cassette/commit/a098a154d6919da62ace361d3d20997cf7fc4285))
+
+
+### Bug Fixes
+
+* address PR review feedback ([624c589](https://github.com/adawalli/cassette/commit/624c5896774e36c0cfbfeaea046e725565601172))
+* address PR review feedback ([4b698fa](https://github.com/adawalli/cassette/commit/4b698fa458bd391ad4edfa2aab3851512ae02207))
+* address PR review feedback ([35479ef](https://github.com/adawalli/cassette/commit/35479efbd8e975c4becf759e880e5aadfc306dea))
+
 ## [0.4.2](https://github.com/adawalli/cassette/compare/v0.4.1...v0.4.2) (2026-03-22)
 
 
