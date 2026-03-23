@@ -139,5 +139,8 @@ export async function loadConfig(configPath?: string): Promise<ResolvedTranscrib
       "copy_filename is set but copy_to is not configured; the template will have no effect",
     );
   }
+  if (config.output?.stem_strip && !config.output?.copy_to) {
+    logger.warn("stem_strip is set but copy_to is not configured; the pattern will have no effect");
+  }
   return normalizeSteps(config);
 }

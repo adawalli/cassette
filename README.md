@@ -131,7 +131,7 @@ output:
     - "-copy$"
 ```
 
-If stripping removes the entire stem, the original value is kept as a safety net.
+Patterns are applied after the leading/trailing date is removed from the stem, so they don't need to account for the date portion. If stripping removes the entire stem, the original value is kept as a safety net.
 
 For `{{title}}` to resolve, the final step's output must contain a YAML front matter block with a `title` field. If the title is missing, empty, or the front matter is malformed, `{{title}}` falls back to `{{stem}}`.
 

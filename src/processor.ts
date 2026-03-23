@@ -75,7 +75,7 @@ export function applyStemStrip(stem: string, patterns: string | string[]): strin
   const list = Array.isArray(patterns) ? patterns : [patterns];
   let result = stem;
   for (const p of list) {
-    result = result.replace(new RegExp(p), "");
+    result = result.replace(new RegExp(p, "g"), "");
   }
   return result.trim() || stem;
 }

@@ -797,6 +797,10 @@ describe("applyStemStrip", () => {
     );
   });
 
+  test("unanchored pattern removes all occurrences", () => {
+    expect(applyStemStrip("a_copy_b_copy", "_copy")).toBe("a_b");
+  });
+
   test("no match leaves stem unchanged", () => {
     expect(applyStemStrip("weekly-standup", "_[a-f0-9]{4,8}$")).toBe("weekly-standup");
   });
