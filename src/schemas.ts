@@ -15,7 +15,7 @@ export const OutputConfigSchema = z
     overwrite: z.boolean().default(false),
     copy_to: z.string().optional(),
     copy_filename: z.string().min(1).optional(),
-    stem_strip: z.union([z.string(), z.array(z.string())]).optional(),
+    stem_strip: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.copy_filename !== undefined) {
