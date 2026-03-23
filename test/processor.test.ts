@@ -671,6 +671,21 @@ describe("copy_filename template", () => {
     expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
   });
 
+  test("{{title}} falls back to {{stem}} when front matter YAML is malformed", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    const llmClient: LlmClient = {
+      generate: async () => "---\n: invalid: yaml: [unclosed\n---\n## Summary\nx",
+    };
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{date}} {{title}}"), {
+      llmClient,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
+  });
+
   test("copy_filename without copy_to is silently accepted", () => {
     const result = OutputConfigSchema.safeParse({ copy_filename: "{{date}} {{title}}" });
     expect(result.success).toBe(true);

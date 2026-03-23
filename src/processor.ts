@@ -90,13 +90,14 @@ function extractTitleFromMarkdown(markdown: string): string | undefined {
   }
 }
 
-const INVALID_FILENAME_CHARS = /[/\\:*?"<>|]/g;
+const INVALID_FILENAME_CHARS = /[/\\:*?"<>|{}]/g;
 
 function sanitizeFilename(name: string): string {
   return name
     .replace(/[\x00-\x1f\x7f]/g, "")
     .replace(INVALID_FILENAME_CHARS, "-")
     .replace(/-{2,}/g, "-")
+    .replace(/\s{2,}/g, " ")
     .replace(/^[-\s]+|[-\s]+$/g, "");
 }
 
@@ -114,8 +115,8 @@ async function copyOutput(
   if (copyFilename) {
     const title = (markdownContent ? extractTitleFromMarkdown(markdownContent) : undefined) ?? stem;
     const resolved = replaceTemplateVars(copyFilename, { date: recordingDate, stem, title });
-    const sanitized = path.basename(sanitizeFilename(resolved)).slice(0, 200);
-    destFilename = sanitized.trim().length > 0 ? `${sanitized}.md` : `${recordingDate} ${stem}.md`;
+    const trimmed = path.basename(sanitizeFilename(resolved)).slice(0, 200).trim();
+    destFilename = trimmed.length > 0 ? `${trimmed}.md` : `${recordingDate} ${stem}.md`;
   } else {
     destFilename = `${recordingDate} ${stem}.md`;
   }
