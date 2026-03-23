@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/adawalli/cassette/compare/v0.5.0...v0.5.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* case-insensitive .md extension check and add coverage for empty-template fallback ([72ea30e](https://github.com/adawalli/cassette/commit/72ea30e8aa25ebf40b6c9185302026b8d7e66d85))
+* prevent double .md extension in copy_filename template ([e1b9915](https://github.com/adawalli/cassette/commit/e1b99154cd69f4f51267b4685335f65e29f43e85))
+* prevent double .md extension when copy_filename template includes .md ([220e9b8](https://github.com/adawalli/cassette/commit/220e9b8bf2db3ebc6babff95a632903b1678eef1))
+
 ## [0.5.0](https://github.com/adawalli/cassette/compare/v0.4.2...v0.5.0) (2026-03-23)
 
 
