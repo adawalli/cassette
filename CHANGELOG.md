@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/adawalli/cassette/compare/v0.5.1...v0.6.0) (2026-03-23)
+
+
+### Features
+
+* add stem_strip config option to clean filenames before copy ([ecf969a](https://github.com/adawalli/cassette/commit/ecf969acad1b5c60c6ad1f5f14584148c74b7deb))
+* add stem_strip config to clean filenames before copy ([a247cbf](https://github.com/adawalli/cassette/commit/a247cbf7107e5b0cf1824f75eec59259c534141a))
+
+
+### Bug Fixes
+
+* address PR review feedback for stem_strip ([3c801ab](https://github.com/adawalli/cassette/commit/3c801ab787e935ae88bebe61ea96af4d89e00cab))
+
 ## [0.5.1](https://github.com/adawalli/cassette/compare/v0.5.0...v0.5.1) (2026-03-23)
 
 
