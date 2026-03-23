@@ -88,6 +88,7 @@ watch:
 output:
   copy_to: ~/notes/meetings
   # copy_filename: "{{date}} {{title}}"  # optional template for copied filenames
+  # stem_strip: "_[a-f0-9]{4,8}$"       # regex to clean unwanted suffixes from {{stem}}
 
 # transcript.path is optional (defaults to "$[*]"), only used for JSON files.
 # VTT files are parsed natively and ignore this section.
@@ -111,6 +112,26 @@ When `copy_to` is set, processed files are copied to that directory. The optiona
 The `.md` extension is appended automatically. Do not include it in the template - `"{{date}} {{title}}"` produces `2026-03-20 Weekly Standup.md`. If the template already ends with `.md` it won't be doubled.
 
 Without `copy_filename`, files are named `{{date}} {{stem}}.md` by default.
+
+### Cleaning up `{{stem}}`
+
+Some transcript tools append uniqueness hashes to filenames (e.g. `weekly-standup_36f1f8.vtt`). The `stem_strip` option removes unwanted patterns from the stem using regex before it's used in templates or default naming.
+
+```yaml
+output:
+  stem_strip: "_[a-f0-9]{4,8}$"
+```
+
+This turns `weekly-standup_36f1f8` into `weekly-standup`. You can also pass an array of patterns - they're applied in order:
+
+```yaml
+output:
+  stem_strip:
+    - "_[a-f0-9]{4,8}$"
+    - "-copy$"
+```
+
+Patterns are applied after the leading/trailing date is removed from the stem, so they don't need to account for the date portion. If stripping removes the entire stem, the original value is kept as a safety net.
 
 For `{{title}}` to resolve, the final step's output must contain a YAML front matter block with a `title` field. If the title is missing, empty, or the front matter is malformed, `{{title}}` falls back to `{{stem}}`.
 

@@ -28,6 +28,7 @@ output:
   overwrite: false
   # copy_to: "~/notes/meetings"
   # copy_filename: "{{date}} {{title}}"  # template for copied filenames; supports {{date}}, {{stem}}, {{title}}
+  # stem_strip: "_[a-f0-9]{4,8}$"       # regex (or array) to strip unwanted suffixes from {{stem}}
 
 failure:
   move_failed: true

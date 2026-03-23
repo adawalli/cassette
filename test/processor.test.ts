@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { processTranscriptFile } from "../src/processor";
+import { processTranscriptFile, applyStemStrip } from "../src/processor";
 import { waitForStableFile } from "../src/stable-wait";
 import type { LlmClient } from "../src/llm";
 import { OutputConfigSchema, type ResolvedTranscriberConfig } from "../src/schemas";
@@ -783,6 +783,103 @@ describe("copy_filename template", () => {
     await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{title}}"), { llmClient });
 
     expect(await fileExists(path.join(vaultDir, "weekly-standup.md"))).toBe(true);
+  });
+});
+
+describe("applyStemStrip", () => {
+  test("single pattern strips matching suffix", () => {
+    expect(applyStemStrip("weekly-standup_36f1f8", "_[a-f0-9]{4,8}$")).toBe("weekly-standup");
+  });
+
+  test("array of patterns applied sequentially", () => {
+    expect(applyStemStrip("weekly-standup_36f1f8-copy", ["_[a-f0-9]{4,8}", "-copy$"])).toBe(
+      "weekly-standup",
+    );
+  });
+
+  test("unanchored pattern removes all occurrences", () => {
+    expect(applyStemStrip("a_copy_b_copy", "_copy")).toBe("a_b");
+  });
+
+  test("no match leaves stem unchanged", () => {
+    expect(applyStemStrip("weekly-standup", "_[a-f0-9]{4,8}$")).toBe("weekly-standup");
+  });
+
+  test("empty result after strip falls back to original", () => {
+    expect(applyStemStrip("abc123", "^[a-z0-9]+$")).toBe("abc123");
+  });
+});
+
+describe("stem_strip schema validation", () => {
+  test("accepts stem_strip as string", () => {
+    const result = OutputConfigSchema.safeParse({ stem_strip: "_[a-f0-9]{4,8}$" });
+    expect(result.success).toBe(true);
+  });
+
+  test("accepts stem_strip as array of strings", () => {
+    const result = OutputConfigSchema.safeParse({
+      stem_strip: ["_[a-f0-9]{4,8}$", "-copy$"],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("rejects invalid regex in stem_strip", () => {
+    const result = OutputConfigSchema.safeParse({ stem_strip: "[invalid(" });
+    expect(result.success).toBe(false);
+  });
+
+  test("rejects invalid regex in stem_strip array", () => {
+    const result = OutputConfigSchema.safeParse({
+      stem_strip: ["valid", "[invalid("],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("stem_strip integration", () => {
+  const SIMPLE_LLM_OUTPUT =
+    "---\ndate: 2026-03-20\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
+  const simpleLlm: LlmClient = { generate: async () => SIMPLE_LLM_OUTPUT };
+
+  test("stem_strip removes hash suffix from copied filename", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const vttPath = path.join(dir, "2026-03-20_weekly-standup_36f1f8.vtt");
+    await writeFile(
+      vttPath,
+      "WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.000\n<v Alice>Hello.</v>",
+      "utf8",
+    );
+
+    const base = copyConfig(dir, vaultDir);
+    const config: ResolvedTranscriberConfig = {
+      ...base,
+      watch: { ...base.watch, include_glob: "**/*.{json,vtt}" },
+      output: { ...base.output, stem_strip: "_[a-f0-9]{4,8}$" },
+    };
+    await processTranscriptFile(vttPath, config, { llmClient: simpleLlm });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
+  });
+
+  test("stem_strip with copy_filename template", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = path.join(dir, "2026-03-20_team-sync_dd1971.json");
+    await writeFile(
+      jsonPath,
+      JSON.stringify({ segments: [{ speaker: "A", text: "hello" }] }),
+      "utf8",
+    );
+
+    const base = copyConfig(dir, vaultDir, "{{date}} {{stem}}");
+    const config: ResolvedTranscriberConfig = {
+      ...base,
+      output: { ...base.output, stem_strip: "_[a-f0-9]{4,8}$" },
+    };
+    await processTranscriptFile(jsonPath, config, { llmClient: simpleLlm });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 team-sync.md"))).toBe(true);
   });
 });
 

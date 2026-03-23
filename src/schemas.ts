@@ -15,16 +15,31 @@ export const OutputConfigSchema = z
     overwrite: z.boolean().default(false),
     copy_to: z.string().optional(),
     copy_filename: z.string().min(1).optional(),
+    stem_strip: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.copy_filename === undefined) return;
-    const vars = [...data.copy_filename.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]!);
-    const unknown = vars.filter((v) => !ALLOWED_TEMPLATE_VARS.has(v));
-    if (unknown.length > 0) {
-      ctx.addIssue({
-        code: "custom",
-        message: `copy_filename contains unknown variable(s): {{${unknown.join("}}, {{")}}}}. Allowed: {{date}}, {{stem}}, {{title}}`,
-      });
+    if (data.copy_filename !== undefined) {
+      const vars = [...data.copy_filename.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]!);
+      const unknown = vars.filter((v) => !ALLOWED_TEMPLATE_VARS.has(v));
+      if (unknown.length > 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: `copy_filename contains unknown variable(s): {{${unknown.join("}}, {{")}}}}. Allowed: {{date}}, {{stem}}, {{title}}`,
+        });
+      }
+    }
+    if (data.stem_strip !== undefined) {
+      const patterns = Array.isArray(data.stem_strip) ? data.stem_strip : [data.stem_strip];
+      for (const p of patterns) {
+        try {
+          new RegExp(p);
+        } catch {
+          ctx.addIssue({
+            code: "custom",
+            message: `stem_strip contains invalid regex: ${p}`,
+          });
+        }
+      }
     }
   });
 
