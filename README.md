@@ -108,7 +108,11 @@ When `copy_to` is set, processed files are copied to that directory. The optiona
 | `{{stem}}` | Filename without extension and leading date |
 | `{{title}}` | YAML front matter `title` field (falls back to `{{stem}}`) |
 
+The `.md` extension is appended automatically. Do not include it in the template - `"{{date}} {{title}}"` produces `2026-03-20 Weekly Standup.md`. If the template already ends with `.md` it won't be doubled.
+
 Without `copy_filename`, files are named `{{date}} {{stem}}.md` by default.
+
+For `{{title}}` to resolve, the final step's output must contain a YAML front matter block with a `title` field. If the title is missing, empty, or the front matter is malformed, `{{title}}` falls back to `{{stem}}`.
 
 ### Prompt chaining
 

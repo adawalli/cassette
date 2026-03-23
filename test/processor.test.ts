@@ -686,6 +686,19 @@ describe("copy_filename template", () => {
     expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
   });
 
+  test("template with .md extension does not produce double .md", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{date}} {{title}}.md"), {
+      llmClient: titledLlm,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 Weekly Standup.md"))).toBe(true);
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 Weekly Standup.md.md"))).toBe(false);
+  });
+
   test("copy_filename without copy_to is silently accepted", () => {
     const result = OutputConfigSchema.safeParse({ copy_filename: "{{date}} {{title}}" });
     expect(result.success).toBe(true);
