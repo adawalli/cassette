@@ -38,7 +38,7 @@ export function copyConfig(
     output: {
       ...base.output,
       copy_to: vaultDir,
-      ...(copyFilename ? { copy_filename: copyFilename } : {}),
+      ...(copyFilename !== undefined ? { copy_filename: copyFilename } : {}),
     },
   };
 }

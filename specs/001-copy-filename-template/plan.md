@@ -5,7 +5,7 @@
 
 ## Summary
 
-Fix `stripDateFromStem` to handle underscore and hyphen separators after leading dates (bug fix), and add an optional `copy_filename` template field to the output config that lets users control how files are named when copied to `copy_to`. The template supports `{date}`, `{stem}`, and `{title}` variables, where `{title}` is extracted from YAML front matter in the processed markdown.
+Fix `stripDateFromStem` to handle underscore and hyphen separators after leading dates (bug fix), and add an optional `copy_filename` template field to the output config that lets users control how files are named when copied to `copy_to`. The template supports `{{date}}`, `{{stem}}`, and `{{title}}` variables, where `{{title}}` is extracted from YAML front matter in the processed markdown.
 
 ## Technical Context
 
