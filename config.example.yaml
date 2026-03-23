@@ -27,6 +27,7 @@ output:
   markdown_suffix: ".md"
   overwrite: false
   # copy_to: "~/notes/meetings"
+  # copy_filename: "{{date}} {{title}}"  # template for copied filenames; supports {{date}}, {{stem}}, {{title}}
 
 failure:
   move_failed: true

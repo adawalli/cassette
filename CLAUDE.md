@@ -19,7 +19,7 @@ This is a CLI tool that watches a directory for meeting transcript files (JSON o
 
 1. `src/index.ts` - CLI entry point: parses args, loads config, wires up `LlmClient` and delegates to `service.ts`
 2. `src/service.ts` - Orchestrates two modes: `runBackfill` (scan+process existing files once) and `runService` (backfill + start watcher). Uses `SerialQueue` to process one file at a time and a `Set<string>` to deduplicate in-flight paths.
-3. `src/processor.ts` - Core processing per file: waits for file stability, reads the input (JSON or VTT), extracts units, calls LLM, writes `.md` output. On failure, optionally moves the source file to a `_failed/` subdirectory and writes an `.error.log`.
+3. `src/processor.ts` - Core processing per file: waits for file stability, reads the input (JSON or VTT), extracts units, calls LLM, writes `.md` output. When `copy_to` is configured, copies the final output with optional template-based naming (`copy_filename`) that supports `{{date}}`, `{{stem}}`, and `{{title}}` variables (title extracted from YAML front matter). On failure, optionally moves the source file to a `_failed/` subdirectory and writes an `.error.log`.
 4. `src/watcher.ts` - Wraps `node:fs.watch` with `{ recursive: true }` to detect new/changed `.json` and `.vtt` files.
 5. `src/extract.ts` - Uses `jsonpath-plus` to extract transcript segments from JSON structures, then renders them as `Speaker: text` lines.
 6. `src/vtt-extract.ts` - Parses WebVTT files into transcript units. Handles speaker tags (`<v Speaker>`), merges consecutive cues from the same speaker, and strips timing metadata.
