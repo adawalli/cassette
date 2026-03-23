@@ -71,6 +71,15 @@ function recordingDateFromBirthtime(fileInfo: { birthtime: Date }): string {
   return fileInfo.birthtime.toISOString().split("T")[0]!;
 }
 
+export function applyStemStrip(stem: string, patterns: string | string[]): string {
+  const list = Array.isArray(patterns) ? patterns : [patterns];
+  let result = stem;
+  for (const p of list) {
+    result = result.replace(new RegExp(p), "");
+  }
+  return result.trim() || stem;
+}
+
 function stripDateFromStem(stem: string): string {
   return stem
     .replace(/^\d{4}-\d{2}-\d{2}[\s_-]+/, "")
@@ -259,7 +268,10 @@ export async function processTranscriptFile(
 
     if (config.output.copy_to) {
       const rawStem = path.basename(filePath, path.extname(filePath));
-      const stem = stripDateFromStem(rawStem);
+      let stem = stripDateFromStem(rawStem);
+      if (config.output.stem_strip) {
+        stem = applyStemStrip(stem, config.output.stem_strip);
+      }
       const lastStepOutput = currentInput;
       await copyOutput(
         lastStep.markdownPath,
