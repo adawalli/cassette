@@ -116,7 +116,13 @@ async function copyOutput(
     const title = (markdownContent ? extractTitleFromMarkdown(markdownContent) : undefined) ?? stem;
     const resolved = replaceTemplateVars(copyFilename, { date: recordingDate, stem, title });
     const trimmed = path.basename(sanitizeFilename(resolved)).slice(0, 200).trim();
-    destFilename = trimmed.length > 0 ? `${trimmed}.md` : `${recordingDate} ${stem}.md`;
+    if (trimmed.length === 0) {
+      destFilename = `${recordingDate} ${stem}.md`;
+    } else if (path.extname(trimmed).toLowerCase() === ".md") {
+      destFilename = trimmed;
+    } else {
+      destFilename = `${trimmed}.md`;
+    }
   } else {
     destFilename = `${recordingDate} ${stem}.md`;
   }
