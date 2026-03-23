@@ -7,11 +7,26 @@ export const WatchConfigSchema = z.object({
   exclude_glob: z.array(z.string()).default(["**/_failed/**"]),
 });
 
-export const OutputConfigSchema = z.object({
-  markdown_suffix: z.string().min(1).default(".md"),
-  overwrite: z.boolean().default(false),
-  copy_to: z.string().optional(),
-});
+const ALLOWED_TEMPLATE_VARS = new Set(["date", "stem", "title"]);
+
+export const OutputConfigSchema = z
+  .object({
+    markdown_suffix: z.string().min(1).default(".md"),
+    overwrite: z.boolean().default(false),
+    copy_to: z.string().optional(),
+    copy_filename: z.string().min(1).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.copy_filename === undefined) return;
+    const vars = [...data.copy_filename.matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]!);
+    const unknown = vars.filter((v) => !ALLOWED_TEMPLATE_VARS.has(v));
+    if (unknown.length > 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: `copy_filename contains unknown variable(s): {{${unknown.join("}}, {{")}}}}. Allowed: {{date}}, {{stem}}, {{title}}`,
+      });
+    }
+  });
 
 export const FailureConfigSchema = z.object({
   move_failed: z.boolean().default(true),

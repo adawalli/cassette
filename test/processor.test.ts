@@ -4,8 +4,8 @@ import path from "node:path";
 import { processTranscriptFile } from "../src/processor";
 import { waitForStableFile } from "../src/stable-wait";
 import type { LlmClient } from "../src/llm";
-import type { ResolvedTranscriberConfig } from "../src/schemas";
-import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
+import { OutputConfigSchema, type ResolvedTranscriberConfig } from "../src/schemas";
+import { baseConfig, copyConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
 
 installTempDirCleanup();
 
@@ -495,6 +495,253 @@ describe("processTranscriptFile - multi-step chaining", () => {
     expect(capturedConfigs[0].temperature).toBe(0.9);
     // other fields come from global config
     expect(capturedConfigs[0].retries).toBe(1);
+  });
+});
+
+describe("stripDateFromStem - separator handling", () => {
+  const SIMPLE_LLM_OUTPUT =
+    "---\ndate: 2026-03-20\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
+  const simpleLlm: LlmClient = { generate: async () => SIMPLE_LLM_OUTPUT };
+
+  test("strips leading date with underscore separator", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const vttPath = path.join(dir, "2026-03-20_weekly-standup.vtt");
+    await writeFile(
+      vttPath,
+      "WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.000\n<v Alice>Hello.</v>",
+      "utf8",
+    );
+
+    const base = copyConfig(dir, vaultDir);
+    const config = { ...base, watch: { ...base.watch, include_glob: "**/*.{json,vtt}" } };
+    await processTranscriptFile(vttPath, config, { llmClient: simpleLlm });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
+  });
+
+  test("strips leading date with hyphen separator", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = path.join(dir, "2026-03-20-team-sync.json");
+    await writeFile(
+      jsonPath,
+      JSON.stringify({ segments: [{ speaker: "A", text: "hello" }] }),
+      "utf8",
+    );
+
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir), { llmClient: simpleLlm });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 team-sync.md"))).toBe(true);
+  });
+
+  test("still strips leading date with space separator (no regression)", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = path.join(dir, "2026-03-20 team sync.json");
+    await writeFile(
+      jsonPath,
+      JSON.stringify({ segments: [{ speaker: "A", text: "hello" }] }),
+      "utf8",
+    );
+
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir), { llmClient: simpleLlm });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 team sync.md"))).toBe(true);
+  });
+
+  test("strips trailing date with underscore separator", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = path.join(dir, "team_sync_2026-03-10.json");
+    await writeFile(
+      jsonPath,
+      JSON.stringify({ segments: [{ speaker: "A", text: "hello" }] }),
+      "utf8",
+    );
+
+    const llmOutput =
+      "---\ndate: 2026-03-10\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir), {
+      llmClient: { generate: async () => llmOutput },
+    });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-10 team_sync.md"))).toBe(true);
+  });
+});
+
+describe("copy_filename template", () => {
+  const TITLED_OUTPUT =
+    "---\ntitle: Weekly Standup\ndate: 2026-03-20\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
+  const titledLlm: LlmClient = { generate: async () => TITLED_OUTPUT };
+
+  async function writeTestJson(dir: string, name: string): Promise<string> {
+    const p = path.join(dir, name);
+    await writeFile(p, JSON.stringify({ segments: [{ speaker: "A", text: "hello" }] }), "utf8");
+    return p;
+  }
+
+  test("resolves {{date}} {{title}} from front matter", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{date}} {{title}}"), {
+      llmClient: titledLlm,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 Weekly Standup.md"))).toBe(true);
+  });
+
+  test("{{title}} falls back to {{stem}} when markdown has no front matter", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    const llmClient: LlmClient = { generate: async () => "## Summary\nJust plain markdown." };
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{date}} {{title}}"), {
+      llmClient,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
+  });
+
+  test("{{title}} falls back to {{stem}} when front matter has no title field", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    const llmClient: LlmClient = {
+      generate: async () => "---\ndate: 2026-03-20\ntags: [meeting]\n---\n## Summary\nx",
+    };
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{date}} {{title}}"), {
+      llmClient,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
+  });
+
+  test("omitting copy_filename preserves default naming", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir), { llmClient: titledLlm });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
+  });
+
+  test("config validation rejects unknown variables", () => {
+    const result = OutputConfigSchema.safeParse({ copy_filename: "{{date}} {{foo}}" });
+    expect(result.success).toBe(false);
+  });
+
+  test("config validation rejects empty copy_filename", () => {
+    const result = OutputConfigSchema.safeParse({ copy_filename: "" });
+    expect(result.success).toBe(false);
+  });
+
+  test("sanitizes filesystem-invalid characters in resolved filename", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_meeting.json");
+
+    const llmClient: LlmClient = {
+      generate: async () => '---\ntitle: "Q1: Planning"\ndate: 2026-03-20\n---\n## Summary\nx',
+    };
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{date}} {{title}}"), {
+      llmClient,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 Q1- Planning.md"))).toBe(true);
+  });
+
+  test("{{title}} falls back to {{stem}} when front matter has empty title", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    const llmClient: LlmClient = {
+      generate: async () => '---\ntitle: ""\ndate: 2026-03-20\n---\n## Summary\nx',
+    };
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{date}} {{title}}"), {
+      llmClient,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
+  });
+
+  test("{{title}} falls back to {{stem}} when front matter YAML is malformed", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    const llmClient: LlmClient = {
+      generate: async () => "---\n: invalid: yaml: [unclosed\n---\n## Summary\nx",
+    };
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{date}} {{title}}"), {
+      llmClient,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
+  });
+
+  test("copy_filename without copy_to is silently accepted", () => {
+    const result = OutputConfigSchema.safeParse({ copy_filename: "{{date}} {{title}}" });
+    expect(result.success).toBe(true);
+  });
+
+  test("template {{stem}} - {{date}} produces reversed format", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{stem}} - {{date}}"), {
+      llmClient: titledLlm,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "weekly-standup - 2026-03-20.md"))).toBe(true);
+  });
+
+  test("template {{title}} alone (no date) produces title-only filename", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{title}}"), {
+      llmClient: titledLlm,
+    });
+
+    expect(await fileExists(path.join(vaultDir, "Weekly Standup.md"))).toBe(true);
+  });
+
+  test("template with all three variables produces combined filename", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    await processTranscriptFile(
+      jsonPath,
+      copyConfig(dir, vaultDir, "{{date}} {{stem}} {{title}}"),
+      { llmClient: titledLlm },
+    );
+
+    expect(
+      await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup Weekly Standup.md")),
+    ).toBe(true);
+  });
+
+  test("{{title}} with empty string falls back to stem for filename", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
+
+    const llmClient: LlmClient = {
+      generate: async () => '---\ntitle: ""\ndate: 2026-03-20\n---\n## Summary\nx',
+    };
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{title}}"), { llmClient });
+
+    expect(await fileExists(path.join(vaultDir, "weekly-standup.md"))).toBe(true);
   });
 });
 

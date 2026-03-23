@@ -27,6 +27,22 @@ export function installTempDirCleanup(): void {
   });
 }
 
+export function copyConfig(
+  rootDir: string,
+  vaultDir: string,
+  copyFilename?: string,
+): ResolvedTranscriberConfig {
+  const base = baseConfig(rootDir);
+  return {
+    ...base,
+    output: {
+      ...base.output,
+      copy_to: vaultDir,
+      ...(copyFilename !== undefined ? { copy_filename: copyFilename } : {}),
+    },
+  };
+}
+
 export function baseConfig(
   rootDir: string,
   overrides?: {

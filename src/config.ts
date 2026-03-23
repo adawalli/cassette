@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
+import { logger } from "./logger";
 import { exists, expandTilde } from "./paths";
 import {
   TranscriberConfigSchema,
@@ -132,6 +133,11 @@ export async function loadConfig(configPath?: string): Promise<ResolvedTranscrib
   config.watch.root_dir = expandTilde(config.watch.root_dir);
   if (config.intake) {
     config.intake.source_dir = expandTilde(config.intake.source_dir);
+  }
+  if (config.output?.copy_filename && !config.output?.copy_to) {
+    logger.warn(
+      "copy_filename is set but copy_to is not configured; the template will have no effect",
+    );
   }
   return normalizeSteps(config);
 }

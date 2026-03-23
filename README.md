@@ -85,6 +85,10 @@ watch:
   root_dir: ~/Documents/meetings
   stable_window_ms: 3000
 
+output:
+  copy_to: ~/notes/meetings
+  # copy_filename: "{{date}} {{title}}"  # optional template for copied filenames
+
 # transcript.path is optional (defaults to "$[*]"), only used for JSON files.
 # VTT files are parsed natively and ignore this section.
 transcript:
@@ -95,6 +99,16 @@ transcript:
 prompt: |
   You are a meeting transcript editor. Clean up this raw transcript...
 ```
+
+When `copy_to` is set, processed files are copied to that directory. The optional `copy_filename` field controls the copied filename using template variables:
+
+| Variable | Description |
+|----------|-------------|
+| `{{date}}` | Recording date in `YYYY-MM-DD` format |
+| `{{stem}}` | Filename without extension and leading date |
+| `{{title}}` | YAML front matter `title` field (falls back to `{{stem}}`) |
+
+Without `copy_filename`, files are named `{{date}} {{stem}}.md` by default.
 
 ### Prompt chaining
 

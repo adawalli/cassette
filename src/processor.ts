@@ -1,6 +1,8 @@
 import { copyFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { parse as parseYaml } from "yaml";
 import { extractTranscriptUnits, renderTranscript } from "./extract";
+import { replaceTemplateVars } from "./hooks";
 import type { LlmClient } from "./llm";
 import { logger } from "./logger";
 import { exists, expandTilde, isVttPath, markdownPathFor } from "./paths";
@@ -70,7 +72,33 @@ function recordingDateFromBirthtime(fileInfo: { birthtime: Date }): string {
 }
 
 function stripDateFromStem(stem: string): string {
-  return stem.replace(/^\d{4}-\d{2}-\d{2}\s+/, "").replace(/[-\s]*\d{4}-\d{2}-\d{2}(?=\.|$)/, "");
+  return stem
+    .replace(/^\d{4}-\d{2}-\d{2}[\s_-]+/, "")
+    .replace(/[_\-\s]*\d{4}-\d{2}-\d{2}(?=\.|$)/, "");
+}
+
+function extractTitleFromMarkdown(markdown: string): string | undefined {
+  const match = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return undefined;
+  try {
+    const frontMatter = parseYaml(match[1]!);
+    const title = frontMatter?.title;
+    if (typeof title === "string" && title.trim().length > 0) return title;
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const INVALID_FILENAME_CHARS = /[/\\:*?"<>|{}]/g;
+
+function sanitizeFilename(name: string): string {
+  return name
+    .replace(/[\x00-\x1f\x7f]/g, "")
+    .replace(INVALID_FILENAME_CHARS, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[-\s]+|[-\s]+$/g, "");
 }
 
 async function copyOutput(
@@ -78,9 +106,21 @@ async function copyOutput(
   copyTo: string,
   recordingDate: string,
   stem: string,
+  copyFilename?: string,
+  markdownContent?: string,
 ): Promise<void> {
   const destDir = expandTilde(copyTo);
-  const destFilename = `${recordingDate} ${stem}.md`;
+  let destFilename: string;
+
+  if (copyFilename) {
+    const title = (markdownContent ? extractTitleFromMarkdown(markdownContent) : undefined) ?? stem;
+    const resolved = replaceTemplateVars(copyFilename, { date: recordingDate, stem, title });
+    const trimmed = path.basename(sanitizeFilename(resolved)).slice(0, 200).trim();
+    destFilename = trimmed.length > 0 ? `${trimmed}.md` : `${recordingDate} ${stem}.md`;
+  } else {
+    destFilename = `${recordingDate} ${stem}.md`;
+  }
+
   const destPath = path.join(destDir, destFilename);
   await mkdir(destDir, { recursive: true });
   await copyFile(sourcePath, destPath);
@@ -214,7 +254,15 @@ export async function processTranscriptFile(
     if (config.output.copy_to) {
       const rawStem = path.basename(filePath, path.extname(filePath));
       const stem = stripDateFromStem(rawStem);
-      await copyOutput(lastStep.markdownPath, config.output.copy_to, recordingDate, stem);
+      const lastStepOutput = currentInput;
+      await copyOutput(
+        lastStep.markdownPath,
+        config.output.copy_to,
+        recordingDate,
+        stem,
+        config.output.copy_filename,
+        lastStepOutput,
+      );
     }
 
     return ProcessingResultSchema.parse({
