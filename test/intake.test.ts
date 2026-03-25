@@ -1,7 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { intakeFile, executeIntake, startIntakeWatcher, weekSubpath } from "../src/intake";
+import { logger } from "../src/logger";
 import { IntakeConfigSchema, TranscriberConfigSchema } from "../src/schemas";
 import type { ResolvedTranscriberConfig } from "../src/schemas";
 import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
@@ -121,6 +122,31 @@ describe("executeIntake", () => {
     // json and txt should remain in source
     expect(await fileExists(path.join(sourceDir, "data.json"))).toBe(true);
     expect(await fileExists(path.join(sourceDir, "notes.txt"))).toBe(true);
+  });
+
+  test("continues processing when a non-FileGoneError occurs for one file", async () => {
+    const sourceDir = await makeTempDir();
+    const rootDir = await makeTempDir();
+    await writeFile(path.join(sourceDir, "good.vtt"), "WEBVTT\n\nhello", "utf8");
+    await writeFile(path.join(sourceDir, "bad.vtt"), "WEBVTT\n\nworld", "utf8");
+
+    // Block the week subdir by placing a file where a directory should be created.
+    // intakeFile calls mkdir(weekSubpath) - pre-create the year component as a file to break it.
+    const yearDir = path.join(rootDir, weekSubpath(new Date()).split(path.sep)[0]!);
+    await writeFile(yearDir, "blocker", "utf8");
+
+    const errorSpy = spyOn(logger, "error").mockImplementation(() => {});
+    try {
+      const results = await executeIntake(intakeConfig(rootDir, sourceDir));
+
+      // Both files should fail (same broken dest), but executeIntake should not throw
+      expect(results).toHaveLength(0);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[intake] executeIntake error"),
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   test("skips files matching exclude_glob", async () => {

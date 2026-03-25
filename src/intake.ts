@@ -5,7 +5,7 @@ import { createGlobFilter } from "./file-filter";
 import { logger } from "./logger";
 import { exists, walkDirectory } from "./paths";
 import { waitForStableFile } from "./stable-wait";
-import type { IntakeConfig, ResolvedTranscriberConfig } from "./schemas";
+import type { AsyncHandle, IntakeConfig, ResolvedTranscriberConfig } from "./schemas";
 
 function requireIntake(config: ResolvedTranscriberConfig): IntakeConfig {
   const intake = config.intake;
@@ -106,12 +106,7 @@ export type IntakeWatcherOptions = {
   onIntake: (destPath: string) => void;
 };
 
-export type IntakeWatcherHandle = {
-  stop: () => void;
-  onIdle: () => Promise<void>;
-};
-
-export function startIntakeWatcher(options: IntakeWatcherOptions): IntakeWatcherHandle {
+export function startIntakeWatcher(options: IntakeWatcherOptions): AsyncHandle {
   const { config, onIntake } = options;
   const intake = requireIntake(config);
   const sourceDir = intake.source_dir;

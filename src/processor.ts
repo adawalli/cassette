@@ -153,11 +153,6 @@ async function quarantineFailure(
     return {};
   }
 
-  if (!(await exists(filePath))) {
-    logger.warn(`source file missing before quarantine move: ${filePath}`);
-    return {};
-  }
-
   const parentDir = path.dirname(filePath);
   const failedDir = path.join(parentDir, config.failure.failed_dir_name);
   logger.debug(`ensuring failed directory exists: ${failedDir}`);
@@ -186,7 +181,7 @@ async function quarantineFailure(
 
     return { errorLogPath, quarantinedPath };
   } catch (quarantineErr) {
-    logger.warn(`quarantine failed for ${filePath}: ${quarantineErr}`);
+    logger.warn(`quarantine failed for ${filePath}: ${errorMessage(quarantineErr)}`);
     return {};
   }
 }
