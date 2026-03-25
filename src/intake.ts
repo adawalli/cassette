@@ -9,11 +9,6 @@ import type { AsyncHandle, IntakeConfig, ResolvedTranscriberConfig } from "./sch
 
 export type ConfigWithIntake = ResolvedTranscriberConfig & { intake: IntakeConfig };
 
-function requireIntake(config: ResolvedTranscriberConfig): ConfigWithIntake {
-  if (!config.intake) throw new Error("intake config required");
-  return config as ConfigWithIntake;
-}
-
 export function weekSubpath(now: Date): string {
   const day = now.getDay();
   const diff = day === 0 ? 6 : day - 1;
