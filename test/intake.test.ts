@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { intakeFile, executeIntake, startIntakeWatcher, weekDir } from "../src/intake";
+import { intakeFile, executeIntake, startIntakeWatcher, weekSubpath } from "../src/intake";
 import { IntakeConfigSchema, TranscriberConfigSchema } from "../src/schemas";
 import type { ResolvedTranscriberConfig } from "../src/schemas";
 import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
@@ -33,19 +33,19 @@ function relFromRoot(rootDir: string, dest: string): string {
   return path.relative(rootDir, dest);
 }
 
-describe("weekDir", () => {
+describe("weekSubpath", () => {
   test("Thursday returns Monday of same week", () => {
     // 2026-02-27 is a Thursday
-    expect(weekDir(new Date(2026, 1, 27))).toBe(path.join("2026", "02-23"));
+    expect(weekSubpath(new Date(2026, 1, 27))).toBe(path.join("2026", "02-23"));
   });
 
   test("Monday returns itself", () => {
-    expect(weekDir(new Date(2026, 1, 23))).toBe(path.join("2026", "02-23"));
+    expect(weekSubpath(new Date(2026, 1, 23))).toBe(path.join("2026", "02-23"));
   });
 
   test("Sunday returns previous Monday", () => {
     // 2026-03-01 is a Sunday
-    expect(weekDir(new Date(2026, 2, 1))).toBe(path.join("2026", "02-23"));
+    expect(weekSubpath(new Date(2026, 2, 1))).toBe(path.join("2026", "02-23"));
   });
 });
 
@@ -88,7 +88,7 @@ describe("intakeFile", () => {
     const rootDir = await makeTempDir();
 
     // Pre-create a file with the same name in the expected week subdir
-    const week = weekDir(new Date());
+    const week = weekSubpath(new Date());
     const weekPath = path.join(rootDir, week);
     await mkdir(weekPath, { recursive: true });
     await writeFile(path.join(weekPath, "meeting.vtt"), "existing", "utf8");

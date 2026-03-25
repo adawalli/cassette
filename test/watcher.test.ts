@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import path from "node:path";
-import type { TranscriberConfig } from "../src/schemas";
+import type { ResolvedTranscriberConfig } from "../src/schemas";
+import { baseConfig } from "./helpers";
 
 // Fake watcher returned by our mock fs.watch
 type WatchListener = (eventType: string, filename: string | Buffer | null) => void;
@@ -20,37 +21,13 @@ const { startRecursiveWatcher } = await import("../src/watcher");
 
 const ROOT = "/tmp/cassette-test-watch";
 
-function makeConfig(overrides?: Partial<TranscriberConfig["watch"]>): TranscriberConfig {
+function makeConfig(
+  overrides?: Partial<ResolvedTranscriberConfig["watch"]>,
+): ResolvedTranscriberConfig {
   return {
-    watch: {
-      root_dir: ROOT,
-      stable_window_ms: 3000,
-      include_glob: "**/*.{json,vtt}",
-      exclude_glob: ["**/_failed/**"],
-      ...overrides,
-    },
-    output: {
-      markdown_suffix: ".md",
-      overwrite: false,
-    },
-    failure: {
-      move_failed: true,
-      failed_dir_name: "_failed",
-      write_error_log: true,
-    },
-    llm: {
-      base_url: "https://api.openai.com/v1/",
-      model: "gpt-4o",
-      temperature: 0.1,
-      max_tokens: 4000,
-      timeout_ms: 120000,
-      retries: 3,
-    },
-    transcript: {
-      path: "$[*]",
-    },
-    prompt: "test prompt",
-  } as TranscriberConfig;
+    ...baseConfig(ROOT),
+    watch: { ...baseConfig(ROOT).watch, include_glob: "**/*.{json,vtt}", ...overrides },
+  };
 }
 
 beforeEach(() => {

@@ -3,8 +3,6 @@ import { logger } from "./logger";
 import { replaceTemplateVars } from "./paths";
 import type { OnCompleteConfig } from "./schemas";
 
-export { replaceTemplateVars };
-
 export async function runOnCompleteHook(
   hookConfig: OnCompleteConfig,
   vars: Record<string, string>,

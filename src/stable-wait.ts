@@ -6,21 +6,21 @@ export async function waitForStableFile(
   stableWindowMs: number,
   pollMs = 250,
 ): Promise<void> {
-  let stableSince = 0;
+  let stableSince: number | null = null;
   let previousSignature = "";
 
   while (true) {
     const info = await stat(filePath);
     const signature = `${info.size}:${info.mtimeMs}`;
     if (signature === previousSignature) {
-      if (stableSince === 0) {
+      if (stableSince === null) {
         stableSince = Date.now();
       } else if (Date.now() - stableSince >= stableWindowMs) {
         return;
       }
     } else {
       previousSignature = signature;
-      stableSince = 0;
+      stableSince = null;
     }
     await sleep(Math.max(50, pollMs));
   }

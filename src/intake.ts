@@ -5,9 +5,15 @@ import { createGlobFilter } from "./file-filter";
 import { logger } from "./logger";
 import { exists, walkDirectory } from "./paths";
 import { waitForStableFile } from "./stable-wait";
-import type { ResolvedTranscriberConfig } from "./schemas";
+import type { IntakeConfig, ResolvedTranscriberConfig } from "./schemas";
 
-export function weekDir(now: Date): string {
+function requireIntake(config: ResolvedTranscriberConfig): IntakeConfig {
+  const intake = config.intake;
+  if (!intake) throw new Error("intake config required");
+  return intake;
+}
+
+export function weekSubpath(now: Date): string {
   const day = now.getDay();
   const diff = day === 0 ? 6 : day - 1;
   const monday = new Date(now);
@@ -36,8 +42,7 @@ class FileGoneError extends Error {
 }
 
 function createIntakeFilter(config: ResolvedTranscriberConfig): (filePath: string) => boolean {
-  const intake = config.intake;
-  if (!intake) throw new Error("intake config required");
+  const intake = requireIntake(config);
   return createGlobFilter({
     baseDir: intake.source_dir,
     includeGlob: intake.include_glob,
@@ -54,8 +59,9 @@ export async function intakeFile(
   }
   await waitForStableFile(filePath, config.watch.stable_window_ms);
 
+  const intake = requireIntake(config);
   const fileName = path.basename(filePath);
-  const destDir = path.join(config.watch.root_dir, weekDir(new Date()));
+  const destDir = path.join(config.watch.root_dir, weekSubpath(new Date()));
   let destPath = path.join(destDir, fileName);
 
   if (await exists(destPath)) {
@@ -64,9 +70,6 @@ export async function intakeFile(
   }
 
   await mkdir(path.dirname(destPath), { recursive: true });
-
-  const intake = config.intake;
-  if (!intake) throw new Error("intake config required");
 
   if (intake.delete_source) {
     await moveFile(filePath, destPath);
@@ -80,8 +83,7 @@ export async function intakeFile(
 }
 
 export async function executeIntake(config: ResolvedTranscriberConfig): Promise<string[]> {
-  const intake = config.intake;
-  if (!intake) throw new Error("intake config required");
+  const intake = requireIntake(config);
   const shouldIntake = createIntakeFilter(config);
 
   const matchedFiles = await walkDirectory(intake.source_dir, shouldIntake);
@@ -111,8 +113,7 @@ export type IntakeWatcherHandle = {
 
 export function startIntakeWatcher(options: IntakeWatcherOptions): IntakeWatcherHandle {
   const { config, onIntake } = options;
-  const intake = config.intake;
-  if (!intake) throw new Error("intake config required");
+  const intake = requireIntake(config);
   const sourceDir = intake.source_dir;
   const shouldIntake = createIntakeFilter(config);
   const inflight = new Map<string, Promise<void>>();

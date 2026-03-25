@@ -197,10 +197,13 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "buffer.vtt"), "WEBVTT\n\nhello", "utf8");
 
     const intaked: string[] = [];
-    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
+    const { onIdle } = startIntakeWatcher({
+      config: cfg,
+      onIntake: (destPath) => intaked.push(destPath),
+    });
 
     capturedListener("rename", Buffer.from("buffer.vtt") as unknown as string);
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await onIdle();
 
     expect(intaked).toHaveLength(1);
     expect(intaked[0]).toContain("buffer.vtt");
