@@ -22,7 +22,7 @@ type ProcessorDeps = {
 
 function collectMarkdownWarnings(markdown: string): string[] {
   const warnings: string[] = [];
-  if (!markdown.includes("---")) {
+  if (!/^---\r?\n/.test(markdown)) {
     warnings.push("Missing YAML front matter block marker");
   }
   if (!markdown.includes("## Action Items")) {
@@ -264,7 +264,12 @@ export async function processTranscriptFile(
         logger.debug(`step "${step.name}" warnings: ${warnings.join(" | ")}`);
       }
 
-      stepResults.push({ stepName: step.name, markdownPath: outPath, warnings });
+      stepResults.push({
+        stepName: step.name,
+        markdownPath: outPath,
+        warnings,
+        notify: step.notify,
+      });
       currentInput = stepOutput;
     }
 

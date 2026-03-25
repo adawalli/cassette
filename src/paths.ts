@@ -44,10 +44,6 @@ export function markdownPathFor(filePath: string, markdownSuffix: string): strin
   return `${filePath.slice(0, -ext.length)}${markdownSuffix}`;
 }
 
-export function isJsonPath(filePath: string): boolean {
-  return path.extname(filePath).toLowerCase() === ".json";
-}
-
 export function isVttPath(filePath: string): boolean {
   return path.extname(filePath).toLowerCase() === ".vtt";
 }

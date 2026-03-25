@@ -5,9 +5,7 @@ import { createGlobFilter } from "./file-filter";
 import { logger } from "./logger";
 import { exists, resolveWatchedPath, walkDirectory } from "./paths";
 import { waitForStableFile } from "./stable-wait";
-import type { AsyncHandle, IntakeConfig, ResolvedTranscriberConfig } from "./schemas";
-
-export type ConfigWithIntake = ResolvedTranscriberConfig & { intake: IntakeConfig };
+import type { AsyncHandle, ConfigWithIntake } from "./schemas";
 
 export function weekSubpath(now: Date): string {
   const day = now.getDay();

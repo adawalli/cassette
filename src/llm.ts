@@ -14,12 +14,7 @@ function getTextContent(content: unknown): string {
     return content.trim();
   }
   if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        return getTextFromContentPart(part);
-      })
-      .join("")
-      .trim();
+    return content.map(getTextFromContentPart).join("").trim();
   }
   if (typeof content === "object" && content !== null) {
     return getTextFromContentPart(content).trim();
