@@ -157,33 +157,36 @@ async function quarantineFailure(
   const failedDir = path.join(parentDir, config.failure.failed_dir_name);
   logger.debug(`ensuring failed directory exists: ${failedDir}`);
 
+  let quarantinedPath: string;
+  const fileName = path.basename(filePath);
   try {
     await mkdir(failedDir, { recursive: true });
-
-    const fileName = path.basename(filePath);
-    let quarantinedPath = path.join(failedDir, fileName);
+    quarantinedPath = path.join(failedDir, fileName);
     if (await exists(quarantinedPath)) {
       const stamp = now.toISOString().replace(/[:.]/g, "-");
       quarantinedPath = path.join(failedDir, `${stamp}-${fileName}`);
       logger.warn(`quarantine target exists, using timestamped path: ${quarantinedPath}`);
     }
-
     logger.info(`moving failed source to quarantine: ${quarantinedPath}`);
     await rename(filePath, quarantinedPath);
-
-    let errorLogPath: string | undefined;
-    if (config.failure.write_error_log) {
-      const baseName = path.basename(fileName, path.extname(fileName));
-      errorLogPath = path.join(failedDir, `${baseName}.error.log`);
-      logger.debug(`writing failure log: ${errorLogPath}`);
-      await writeFile(errorLogPath, formatErrorLog(error, now), "utf8");
-    }
-
-    return { errorLogPath, quarantinedPath };
   } catch (quarantineErr) {
     logger.warn(`quarantine failed for ${filePath}: ${errorMessage(quarantineErr)}`);
     return {};
   }
+
+  let errorLogPath: string | undefined;
+  if (config.failure.write_error_log) {
+    try {
+      const baseName = path.basename(fileName, path.extname(fileName));
+      errorLogPath = path.join(failedDir, `${baseName}.error.log`);
+      logger.debug(`writing failure log: ${errorLogPath}`);
+      await writeFile(errorLogPath, formatErrorLog(error, now), "utf8");
+    } catch (logErr) {
+      logger.warn(`failed to write quarantine error log for ${filePath}: ${errorMessage(logErr)}`);
+    }
+  }
+
+  return { errorLogPath, quarantinedPath };
 }
 
 export async function processTranscriptFile(

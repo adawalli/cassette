@@ -133,7 +133,9 @@ export function startIntakeWatcher(options: IntakeWatcherOptions): AsyncHandle {
           onIntake(destPath);
         } catch (err) {
           if (!(err instanceof FileGoneError)) {
-            logger.error(`[intake] watcher error for ${fullPath}: ${err}`);
+            logger.error(
+              `[intake] watcher error for ${fullPath}: ${err instanceof Error ? err.message : String(err)}`,
+            );
           }
         } finally {
           inflight.delete(fullPath);
