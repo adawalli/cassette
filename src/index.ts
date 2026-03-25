@@ -102,6 +102,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
   logger.info(`cassette v${VERSION}`);
 
+  if (args.debug) {
+    logger.setLevel("debug");
+  }
+
   const resolvedConfigPath = args.configPath ?? resolveConfigPath(process.env);
   let config;
   try {
@@ -114,9 +118,6 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     }
     throw error;
   }
-  if (args.debug) {
-    logger.setLevel("debug");
-  }
 
   const llmClient = createOpenAILlmClient(process.env);
 
@@ -125,7 +126,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
 
-  const stop = await runService(config, { llmClient });
+  const { stop } = await runService(config, { llmClient });
 
   const shutdown = (): void => {
     stop();

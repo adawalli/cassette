@@ -36,7 +36,8 @@ class FileGoneError extends Error {
 }
 
 function createIntakeFilter(config: ResolvedTranscriberConfig): (filePath: string) => boolean {
-  const intake = config.intake!;
+  const intake = config.intake;
+  if (!intake) throw new Error("intake config required");
   return createGlobFilter({
     baseDir: intake.source_dir,
     includeGlob: intake.include_glob,
@@ -64,26 +65,36 @@ export async function intakeFile(
 
   await mkdir(path.dirname(destPath), { recursive: true });
 
-  if (config.intake!.delete_source) {
+  const intake = config.intake;
+  if (!intake) throw new Error("intake config required");
+
+  if (intake.delete_source) {
     await moveFile(filePath, destPath);
   } else {
     await copyFile(filePath, destPath);
   }
-  const verb = config.intake!.delete_source ? "moved" : "copied";
+  const verb = intake.delete_source ? "moved" : "copied";
   logger.info(`[intake] ${verb}: ${filePath} -> ${destPath}`);
 
   return destPath;
 }
 
 export async function executeIntake(config: ResolvedTranscriberConfig): Promise<string[]> {
-  const sourceDir = config.intake!.source_dir;
+  const intake = config.intake;
+  if (!intake) throw new Error("intake config required");
   const shouldIntake = createIntakeFilter(config);
 
-  const matchedFiles = await walkDirectory(sourceDir, shouldIntake);
+  const matchedFiles = await walkDirectory(intake.source_dir, shouldIntake);
   const results: string[] = [];
   for (const filePath of matchedFiles) {
-    const destPath = await intakeFile(filePath, config);
-    results.push(destPath);
+    try {
+      const destPath = await intakeFile(filePath, config);
+      results.push(destPath);
+    } catch (err) {
+      if (!(err instanceof FileGoneError)) {
+        logger.error(`[intake] executeIntake error for ${filePath}: ${err}`);
+      }
+    }
   }
   return results;
 }
@@ -93,11 +104,18 @@ export type IntakeWatcherOptions = {
   onIntake: (destPath: string) => void;
 };
 
-export function startIntakeWatcher(options: IntakeWatcherOptions): () => void {
+export type IntakeWatcherHandle = {
+  stop: () => void;
+  onIdle: () => Promise<void>;
+};
+
+export function startIntakeWatcher(options: IntakeWatcherOptions): IntakeWatcherHandle {
   const { config, onIntake } = options;
-  const sourceDir = config.intake!.source_dir;
+  const intake = config.intake;
+  if (!intake) throw new Error("intake config required");
+  const sourceDir = intake.source_dir;
   const shouldIntake = createIntakeFilter(config);
-  const inflight = new Set<string>();
+  const inflight = new Map<string, Promise<void>>();
 
   const watcher = watch(
     sourceDir,
@@ -111,8 +129,7 @@ export function startIntakeWatcher(options: IntakeWatcherOptions): () => void {
       if (!shouldIntake(fullPath) || inflight.has(fullPath)) {
         return;
       }
-      inflight.add(fullPath);
-      (async () => {
+      const p = (async () => {
         try {
           const destPath = await intakeFile(fullPath, config);
           onIntake(destPath);
@@ -124,8 +141,12 @@ export function startIntakeWatcher(options: IntakeWatcherOptions): () => void {
           inflight.delete(fullPath);
         }
       })();
+      inflight.set(fullPath, p);
     },
   );
 
-  return () => watcher.close();
+  return {
+    stop: () => watcher.close(),
+    onIdle: () => Promise.all(inflight.values()).then(() => {}),
+  };
 }

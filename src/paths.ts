@@ -57,6 +57,10 @@ export function isInFailedDirectory(filePath: string, failedDirName: string): bo
   return segments.includes(failedDirName);
 }
 
+export function replaceTemplateVars(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => vars[key] ?? match);
+}
+
 export async function walkDirectory(
   dir: string,
   filter: (filePath: string) => boolean,

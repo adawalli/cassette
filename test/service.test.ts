@@ -198,9 +198,8 @@ describe("runService", () => {
 
     const cfg = config(dir);
     cfg.watch.stable_window_ms = 0;
-    const stop = await runService(cfg, { llmClient });
-    // Wait for the serial queue to drain (stability polling needs time)
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const { stop, onIdle } = await runService(cfg, { llmClient });
+    await onIdle();
     stop();
 
     expect(generated.length).toBe(1);
@@ -222,8 +221,8 @@ describe("runService", () => {
 
     const cfg = config(dir);
     cfg.watch.stable_window_ms = 0;
-    const stop = await runService(cfg, { llmClient });
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const { stop, onIdle } = await runService(cfg, { llmClient });
+    await onIdle();
     stop();
 
     // File should only be processed once despite being found by scanInputFiles
@@ -256,8 +255,8 @@ describe("runService", () => {
       generate: async () => "# Notes\n\nAlice said hello.",
     };
 
-    const stop = await runService(cfg, { llmClient });
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const { stop, onIdle } = await runService(cfg, { llmClient });
+    await onIdle();
     stop();
 
     // Source file should have been intaked (moved)
@@ -268,11 +267,12 @@ describe("runService", () => {
     const dir = await makeTempDir();
 
     const llmClient: LlmClient = { generate: async () => "# out" };
-    const stop = await runService(config(dir), { llmClient });
+    const handle = await runService(config(dir), { llmClient });
 
-    // stop should be a function (the main watcher's cleanup)
-    expect(typeof stop).toBe("function");
-    stop();
+    // handle should have stop and onIdle
+    expect(typeof handle.stop).toBe("function");
+    expect(typeof handle.onIdle).toBe("function");
+    handle.stop();
   });
 });
 

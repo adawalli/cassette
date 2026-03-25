@@ -109,10 +109,15 @@ export async function runBackfill(
   await queue.onIdle();
 }
 
+export type ServiceHandle = {
+  stop: () => void;
+  onIdle: () => Promise<void>;
+};
+
 export async function runService(
   config: ResolvedTranscriberConfig,
   deps: ServiceDeps,
-): Promise<() => void> {
+): Promise<ServiceHandle> {
   const queue = new SerialQueue();
   const pending = new Set<string>();
 
@@ -153,12 +158,15 @@ export async function runService(
   });
 
   if (config.intake) {
-    const stopIntakeWatcher = startIntakeWatcher({ config, onIntake: enqueuePath });
-    return () => {
-      stopIntakeWatcher();
-      stopMainWatcher();
+    const intakeWatcher = startIntakeWatcher({ config, onIntake: enqueuePath });
+    return {
+      stop: () => {
+        intakeWatcher.stop();
+        stopMainWatcher();
+      },
+      onIdle: () => queue.onIdle(),
     };
   }
 
-  return stopMainWatcher;
+  return { stop: stopMainWatcher, onIdle: () => queue.onIdle() };
 }

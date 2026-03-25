@@ -131,6 +131,7 @@ export function createOpenAILlmClient(env: NodeJS.ProcessEnv = process.env): Llm
         minTimeout: 0,
         shouldRetry: ({ error }) => isRetryable(error),
         onFailedAttempt: async ({ error, attemptNumber, retriesLeft }) => {
+          // p-retry calls onFailedAttempt even on the final failure; skip delay when no retry will follow
           if (retriesLeft === 0) {
             return;
           }
