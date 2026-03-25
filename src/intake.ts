@@ -94,7 +94,9 @@ export async function executeIntake(config: ResolvedTranscriberConfig): Promise<
       results.push(destPath);
     } catch (err) {
       if (!(err instanceof FileGoneError)) {
-        logger.error(`[intake] executeIntake error for ${filePath}: ${err}`);
+        logger.error(
+          `[intake] executeIntake error for ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
   }
