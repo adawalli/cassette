@@ -60,20 +60,17 @@ function summarizeChoice(choice: unknown): string {
 
   const item = choice as {
     finish_reason?: unknown;
-    text?: unknown;
     message?: { content?: unknown; refusal?: unknown } | null;
   };
   const message = item.message ?? undefined;
   const contentKind = Array.isArray(message?.content) ? "array" : typeof message?.content;
   const contentLength = getTextContent(message?.content).length;
-  const legacyTextLength = typeof item.text === "string" ? item.text.trim().length : 0;
   const refusalLength = typeof message?.refusal === "string" ? message.refusal.trim().length : 0;
 
   return [
     `finish_reason=${String(item.finish_reason ?? "unknown")}`,
     `content_kind=${contentKind}`,
     `content_text_len=${contentLength}`,
-    `legacy_text_len=${legacyTextLength}`,
     `refusal_len=${refusalLength}`,
   ].join(", ");
 }
@@ -114,12 +111,7 @@ export function createOpenAILlmClient(env: NodeJS.ProcessEnv = process.env): Llm
         });
 
         const choice = response.choices[0];
-        const contentFromMessage = getTextContent(choice?.message?.content);
-        const contentFromLegacyText =
-          typeof (choice as { text?: unknown } | undefined)?.text === "string"
-            ? ((choice as { text?: string }).text ?? "").trim()
-            : "";
-        const content = contentFromMessage || contentFromLegacyText;
+        const content = getTextContent(choice?.message?.content);
         if (!content) {
           throw new Error(`LLM response did not include text content (${summarizeChoice(choice)})`);
         }

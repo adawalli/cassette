@@ -3,14 +3,15 @@ import { watch } from "node:fs";
 import path from "node:path";
 import { createGlobFilter } from "./file-filter";
 import { logger } from "./logger";
-import { exists, walkDirectory } from "./paths";
+import { exists, resolveWatchedPath, walkDirectory } from "./paths";
 import { waitForStableFile } from "./stable-wait";
 import type { AsyncHandle, IntakeConfig, ResolvedTranscriberConfig } from "./schemas";
 
-function requireIntake(config: ResolvedTranscriberConfig): IntakeConfig {
-  const intake = config.intake;
-  if (!intake) throw new Error("intake config required");
-  return intake;
+export type ConfigWithIntake = ResolvedTranscriberConfig & { intake: IntakeConfig };
+
+function requireIntake(config: ResolvedTranscriberConfig): ConfigWithIntake {
+  if (!config.intake) throw new Error("intake config required");
+  return config as ConfigWithIntake;
 }
 
 export function weekSubpath(now: Date): string {
@@ -41,31 +42,39 @@ class FileGoneError extends Error {
   }
 }
 
-function createIntakeFilter(config: ResolvedTranscriberConfig): (filePath: string) => boolean {
-  const intake = requireIntake(config);
+function logIntakeError(context: string, filePath: string, err: unknown): void {
+  if (!(err instanceof FileGoneError)) {
+    logger.error(
+      `[intake] ${context} error for ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+function createIntakeFilter(config: ConfigWithIntake): (filePath: string) => boolean {
   return createGlobFilter({
-    baseDir: intake.source_dir,
-    includeGlob: intake.include_glob,
-    excludeGlobs: intake.exclude_glob,
+    baseDir: config.intake.source_dir,
+    includeGlob: config.intake.include_glob,
+    excludeGlobs: config.intake.exclude_glob,
   });
 }
 
 export async function intakeFile(
   filePath: string,
-  config: ResolvedTranscriberConfig,
+  config: ConfigWithIntake,
+  now: () => Date = () => new Date(),
 ): Promise<string> {
   if (!(await exists(filePath))) {
     throw new FileGoneError(filePath);
   }
   await waitForStableFile(filePath, config.watch.stable_window_ms);
 
-  const intake = requireIntake(config);
+  const { intake } = config;
   const fileName = path.basename(filePath);
-  const destDir = path.join(config.watch.root_dir, weekSubpath(new Date()));
+  const destDir = path.join(config.watch.root_dir, weekSubpath(now()));
   let destPath = path.join(destDir, fileName);
 
   if (await exists(destPath)) {
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const stamp = now().toISOString().replace(/[:.]/g, "-");
     destPath = path.join(destDir, `${stamp}-${fileName}`);
   }
 
@@ -82,36 +91,29 @@ export async function intakeFile(
   return destPath;
 }
 
-export async function executeIntake(config: ResolvedTranscriberConfig): Promise<string[]> {
-  const intake = requireIntake(config);
+export async function executeIntake(config: ConfigWithIntake): Promise<string[]> {
   const shouldIntake = createIntakeFilter(config);
-
-  const matchedFiles = await walkDirectory(intake.source_dir, shouldIntake);
+  const matchedFiles = await walkDirectory(config.intake.source_dir, shouldIntake);
   const results: string[] = [];
   for (const filePath of matchedFiles) {
     try {
       const destPath = await intakeFile(filePath, config);
       results.push(destPath);
     } catch (err) {
-      if (!(err instanceof FileGoneError)) {
-        logger.error(
-          `[intake] executeIntake error for ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
+      logIntakeError("executeIntake", filePath, err);
     }
   }
   return results;
 }
 
 export type IntakeWatcherOptions = {
-  config: ResolvedTranscriberConfig;
+  config: ConfigWithIntake;
   onIntake: (destPath: string) => void;
 };
 
 export function startIntakeWatcher(options: IntakeWatcherOptions): AsyncHandle {
   const { config, onIntake } = options;
-  const intake = requireIntake(config);
-  const sourceDir = intake.source_dir;
+  const sourceDir = config.intake.source_dir;
   const shouldIntake = createIntakeFilter(config);
   const inflight = new Map<string, Promise<void>>();
 
@@ -119,12 +121,8 @@ export function startIntakeWatcher(options: IntakeWatcherOptions): AsyncHandle {
     sourceDir,
     { recursive: true },
     (_eventType: string, fileName: string | Buffer | null) => {
-      if (!fileName) {
-        return;
-      }
-      const rawName = typeof fileName === "string" ? fileName : fileName.toString("utf8");
-      const fullPath = path.join(sourceDir, rawName);
-      if (!shouldIntake(fullPath) || inflight.has(fullPath)) {
+      const fullPath = resolveWatchedPath(sourceDir, fileName);
+      if (!fullPath || !shouldIntake(fullPath) || inflight.has(fullPath)) {
         return;
       }
       const p = (async () => {
@@ -132,11 +130,7 @@ export function startIntakeWatcher(options: IntakeWatcherOptions): AsyncHandle {
           const destPath = await intakeFile(fullPath, config);
           onIntake(destPath);
         } catch (err) {
-          if (!(err instanceof FileGoneError)) {
-            logger.error(
-              `[intake] watcher error for ${fullPath}: ${err instanceof Error ? err.message : String(err)}`,
-            );
-          }
+          logIntakeError("watcher", fullPath, err);
         } finally {
           inflight.delete(fullPath);
         }

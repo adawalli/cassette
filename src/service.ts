@@ -1,9 +1,10 @@
 import { createFileFilter } from "./file-filter";
 import { runOnCompleteHook } from "./hooks";
+import type { ConfigWithIntake } from "./intake";
 import { executeIntake, startIntakeWatcher } from "./intake";
 import type { LlmClient } from "./llm";
 import { logger } from "./logger";
-import { isInFailedDirectory, walkDirectory } from "./paths";
+import { isEnoent, isInFailedDirectory, walkDirectory } from "./paths";
 import { processTranscriptFile } from "./processor";
 import { SerialQueue } from "./queue";
 import type { AsyncHandle, ProcessingResult, ResolvedTranscriberConfig } from "./schemas";
@@ -78,13 +79,18 @@ async function fireOnCompleteHooks(
   await runOnCompleteHook(on_complete, { ...baseVars, output: result.markdownPath });
 }
 
-export async function scanInputFiles(config: ResolvedTranscriberConfig): Promise<string[]> {
+export function scanInputFiles(config: ResolvedTranscriberConfig): Promise<string[]> {
   const shouldProcess = createFileFilter(config);
   const failedDirName = config.failure.failed_dir_name;
 
   return walkDirectory(config.watch.root_dir, shouldProcess, (dirPath) =>
     isInFailedDirectory(dirPath, failedDirName),
-  );
+  ).catch((err) => {
+    if (isEnoent(err)) {
+      throw new Error(`Watch root_dir not found: ${config.watch.root_dir}`);
+    }
+    throw err;
+  });
 }
 
 export async function runBackfill(
@@ -92,7 +98,7 @@ export async function runBackfill(
   deps: ServiceDeps,
 ): Promise<void> {
   if (config.intake) {
-    await executeIntake(config);
+    await executeIntake(config as ConfigWithIntake);
   }
   const queue = new SerialQueue();
   const files = await scanInputFiles(config);
@@ -135,8 +141,10 @@ export async function runService(
     });
   };
 
-  if (config.intake) {
-    const intakeFiles = await executeIntake(config);
+  const configWithIntake = config.intake ? (config as ConfigWithIntake) : null;
+
+  if (configWithIntake) {
+    const intakeFiles = await executeIntake(configWithIntake);
     for (const filePath of intakeFiles) {
       enqueuePath(filePath);
     }
@@ -147,24 +155,19 @@ export async function runService(
     enqueuePath(filePath);
   }
 
-  const stopMainWatcher = startRecursiveWatcher({
-    config,
-    onFilePath: enqueuePath,
-  });
+  const mainWatcher = startRecursiveWatcher({ config, onFilePath: enqueuePath });
+  const intakeWatcher = configWithIntake
+    ? startIntakeWatcher({ config: configWithIntake, onIntake: enqueuePath })
+    : null;
 
-  if (config.intake) {
-    const intakeWatcher = startIntakeWatcher({ config, onIntake: enqueuePath });
-    return {
-      stop: () => {
-        intakeWatcher.stop();
-        stopMainWatcher();
-      },
-      onIdle: async () => {
-        await intakeWatcher.onIdle();
-        await queue.onIdle();
-      },
-    };
-  }
-
-  return { stop: stopMainWatcher, onIdle: () => queue.onIdle() };
+  return {
+    stop: () => {
+      mainWatcher.stop();
+      intakeWatcher?.stop();
+    },
+    onIdle: async () => {
+      await intakeWatcher?.onIdle();
+      await queue.onIdle();
+    },
+  };
 }

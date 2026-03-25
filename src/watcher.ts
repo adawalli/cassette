@@ -1,25 +1,23 @@
 import { watch } from "node:fs";
-import path from "node:path";
 import { createFileFilter } from "./file-filter";
-import type { ResolvedTranscriberConfig } from "./schemas";
+import { resolveWatchedPath } from "./paths";
+import type { AsyncHandle, ResolvedTranscriberConfig } from "./schemas";
 
 export type WatcherOptions = {
   config: ResolvedTranscriberConfig;
   onFilePath: (filePath: string) => void;
 };
 
-export function startRecursiveWatcher(options: WatcherOptions): () => void {
+export function startRecursiveWatcher(options: WatcherOptions): AsyncHandle {
   const shouldProcess = createFileFilter(options.config);
   const watcher = watch(
     options.config.watch.root_dir,
     { recursive: true },
     (_eventType: string, fileName: string | Buffer | null) => {
-      if (!fileName) {
+      const fullPath = resolveWatchedPath(options.config.watch.root_dir, fileName);
+      if (!fullPath) {
         return;
       }
-
-      const rawName = typeof fileName === "string" ? fileName : fileName.toString("utf8");
-      const fullPath = path.join(options.config.watch.root_dir, rawName);
       if (!shouldProcess(fullPath)) {
         return;
       }
@@ -27,5 +25,5 @@ export function startRecursiveWatcher(options: WatcherOptions): () => void {
     },
   );
 
-  return () => watcher.close();
+  return { stop: () => watcher.close(), onIdle: () => Promise.resolve() };
 }

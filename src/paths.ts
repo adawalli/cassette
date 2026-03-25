@@ -61,6 +61,15 @@ export function replaceTemplateVars(template: string, vars: Record<string, strin
   return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => vars[key] ?? match);
 }
 
+export function resolveWatchedPath(
+  baseDir: string,
+  fileName: string | Buffer | null,
+): string | null {
+  if (!fileName) return null;
+  const rawName = typeof fileName === "string" ? fileName : fileName.toString("utf8");
+  return path.join(baseDir, rawName);
+}
+
 export async function walkDirectory(
   dir: string,
   filter: (filePath: string) => boolean,
