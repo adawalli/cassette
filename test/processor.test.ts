@@ -1,9 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { processTranscriptFile, applyStemStrip } from "../src/processor";
 import { waitForStableFile } from "../src/stable-wait";
 import type { LlmClient } from "../src/llm";
+import { logger } from "../src/logger";
 import { OutputConfigSchema, type ResolvedTranscriberConfig } from "../src/schemas";
 import { baseConfig, copyConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
 
@@ -303,6 +304,35 @@ describe("processTranscriptFile", () => {
     expect(result.status).toBe("failed");
     if (result.status === "failed") {
       expect(result.quarantinedPath).toMatch(/\d{4}-\d{2}-\d{2}T/);
+    }
+  });
+
+  test("returns failed gracefully when quarantine itself throws", async () => {
+    const dir = await makeTempDir();
+    const jsonPath = path.join(dir, "meeting.json");
+    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+
+    // Pre-create _failed as a file so mkdir throws ENOTDIR
+    await writeFile(path.join(dir, "_failed"), "blocker", "utf8");
+
+    const llmClient: LlmClient = {
+      generate: async () => {
+        throw new Error("upstream error");
+      },
+    };
+
+    const warnSpy = spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      const result = await processTranscriptFile(jsonPath, baseConfig(dir), { llmClient });
+      expect(result.status).toBe("failed");
+      if (result.status === "failed") {
+        expect(result.errorMessage).toBe("upstream error");
+        expect(result.quarantinedPath).toBeUndefined();
+        expect(result.errorLogPath).toBeUndefined();
+      }
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("quarantine failed"));
+    } finally {
+      warnSpy.mockRestore();
     }
   });
 });

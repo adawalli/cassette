@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { replaceTemplateVars, runOnCompleteHook } from "../src/hooks";
+import { runOnCompleteHook } from "../src/hooks";
+import { replaceTemplateVars } from "../src/paths";
 import type { OnCompleteConfig } from "../src/schemas";
 
 function hookConfig(overrides?: Partial<OnCompleteConfig>): OnCompleteConfig {

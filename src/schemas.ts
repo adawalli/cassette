@@ -159,3 +159,8 @@ export type IntakeConfig = z.infer<typeof IntakeConfigSchema>;
 export type ResolvedTranscriberConfig = Omit<TranscriberConfig, "prompt" | "steps"> & {
   steps: StepConfig[];
 };
+
+export type AsyncHandle = {
+  stop: () => void;
+  onIdle: () => Promise<void>;
+};

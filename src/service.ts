@@ -6,7 +6,7 @@ import { logger } from "./logger";
 import { isInFailedDirectory, walkDirectory } from "./paths";
 import { processTranscriptFile } from "./processor";
 import { SerialQueue } from "./queue";
-import type { ProcessingResult, ResolvedTranscriberConfig } from "./schemas";
+import type { AsyncHandle, ProcessingResult, ResolvedTranscriberConfig } from "./schemas";
 import { startRecursiveWatcher } from "./watcher";
 
 type ServiceDeps = {
@@ -112,7 +112,7 @@ export async function runBackfill(
 export async function runService(
   config: ResolvedTranscriberConfig,
   deps: ServiceDeps,
-): Promise<() => void> {
+): Promise<AsyncHandle> {
   const queue = new SerialQueue();
   const pending = new Set<string>();
 
@@ -153,12 +153,18 @@ export async function runService(
   });
 
   if (config.intake) {
-    const stopIntakeWatcher = startIntakeWatcher({ config, onIntake: enqueuePath });
-    return () => {
-      stopIntakeWatcher();
-      stopMainWatcher();
+    const intakeWatcher = startIntakeWatcher({ config, onIntake: enqueuePath });
+    return {
+      stop: () => {
+        intakeWatcher.stop();
+        stopMainWatcher();
+      },
+      onIdle: async () => {
+        await intakeWatcher.onIdle();
+        await queue.onIdle();
+      },
     };
   }
 
-  return stopMainWatcher;
+  return { stop: stopMainWatcher, onIdle: () => queue.onIdle() };
 }

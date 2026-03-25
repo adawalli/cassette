@@ -1,10 +1,10 @@
 import { watch } from "node:fs";
 import path from "node:path";
 import { createFileFilter } from "./file-filter";
-import type { TranscriberConfig } from "./schemas";
+import type { ResolvedTranscriberConfig } from "./schemas";
 
 export type WatcherOptions = {
-  config: TranscriberConfig;
+  config: ResolvedTranscriberConfig;
   onFilePath: (filePath: string) => void;
 };
 

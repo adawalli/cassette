@@ -54,10 +54,13 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "call.vtt"), "WEBVTT\n\nhello", "utf8");
 
     const intaked: string[] = [];
-    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
+    const { onIdle } = startIntakeWatcher({
+      config: cfg,
+      onIntake: (destPath) => intaked.push(destPath),
+    });
 
     capturedListener("rename", "call.vtt");
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await onIdle();
 
     expect(intaked).toHaveLength(1);
     expect(intaked[0]).toContain("call.vtt");
@@ -69,10 +72,13 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     const cfg = intakeWatcherConfig(rootDir, sourceDir);
 
     const intaked: string[] = [];
-    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
+    const { onIdle } = startIntakeWatcher({
+      config: cfg,
+      onIntake: (destPath) => intaked.push(destPath),
+    });
 
     capturedListener("rename", null as unknown as string);
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await onIdle();
 
     expect(intaked).toHaveLength(0);
   });
@@ -85,10 +91,13 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "notes.txt"), "hello", "utf8");
 
     const intaked: string[] = [];
-    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
+    const { onIdle } = startIntakeWatcher({
+      config: cfg,
+      onIntake: (destPath) => intaked.push(destPath),
+    });
 
     capturedListener("rename", "notes.txt");
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await onIdle();
 
     expect(intaked).toHaveLength(0);
   });
@@ -101,13 +110,16 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "dup.vtt"), "WEBVTT\n\nhello", "utf8");
 
     const intaked: string[] = [];
-    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
+    const { onIdle } = startIntakeWatcher({
+      config: cfg,
+      onIntake: (destPath) => intaked.push(destPath),
+    });
 
     capturedListener("rename", "dup.vtt");
     capturedListener("rename", "dup.vtt");
     capturedListener("rename", "dup.vtt");
 
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await onIdle();
 
     expect(intaked).toHaveLength(1);
   });
@@ -118,10 +130,13 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     const cfg = intakeWatcherConfig(rootDir, sourceDir);
 
     const intaked: string[] = [];
-    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
+    const { onIdle } = startIntakeWatcher({
+      config: cfg,
+      onIntake: (destPath) => intaked.push(destPath),
+    });
 
     capturedListener("rename", "ghost.vtt");
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await onIdle();
 
     expect(intaked).toHaveLength(0);
   });
@@ -132,16 +147,19 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     const cfg = intakeWatcherConfig(rootDir, sourceDir);
 
     const intaked: string[] = [];
-    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
+    const { onIdle } = startIntakeWatcher({
+      config: cfg,
+      onIntake: (destPath) => intaked.push(destPath),
+    });
 
     // File does not exist -> FileGoneError which is silently caught
     capturedListener("rename", "nonexistent.vtt");
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await onIdle();
 
     // After the error, inflight should be cleaned up, allowing re-processing
     await writeFile(path.join(sourceDir, "nonexistent.vtt"), "WEBVTT\n\nhello", "utf8");
     capturedListener("rename", "nonexistent.vtt");
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await onIdle();
 
     expect(intaked).toHaveLength(1);
   });
@@ -154,7 +172,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "exists.vtt"), "WEBVTT\n\nhello", "utf8");
 
     const errorSpy = spyOn(logger, "error").mockImplementation(() => {});
-    const stop = startIntakeWatcher({
+    const { stop, onIdle } = startIntakeWatcher({
       config: cfg,
       onIntake: () => {
         throw new Error("downstream failure");
@@ -162,7 +180,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     });
     try {
       capturedListener("rename", "exists.vtt");
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await onIdle();
 
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("[intake] watcher error"));
     } finally {
@@ -179,10 +197,13 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     await writeFile(path.join(sourceDir, "buffer.vtt"), "WEBVTT\n\nhello", "utf8");
 
     const intaked: string[] = [];
-    startIntakeWatcher({ config: cfg, onIntake: (destPath) => intaked.push(destPath) });
+    const { onIdle } = startIntakeWatcher({
+      config: cfg,
+      onIntake: (destPath) => intaked.push(destPath),
+    });
 
     capturedListener("rename", Buffer.from("buffer.vtt") as unknown as string);
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await onIdle();
 
     expect(intaked).toHaveLength(1);
     expect(intaked[0]).toContain("buffer.vtt");
@@ -193,7 +214,7 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
     const sourceDir = await makeTempDir();
     const rootDir = await makeTempDir();
     const cfg = intakeWatcherConfig(rootDir, sourceDir);
-    const stop = startIntakeWatcher({ config: cfg, onIntake: () => {} });
+    const { stop } = startIntakeWatcher({ config: cfg, onIntake: () => {} });
 
     expect(fakeClose).not.toHaveBeenCalled();
     stop();

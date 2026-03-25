@@ -1,10 +1,7 @@
 import { spawn } from "node:child_process";
 import { logger } from "./logger";
+import { replaceTemplateVars } from "./paths";
 import type { OnCompleteConfig } from "./schemas";
-
-export function replaceTemplateVars(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => vars[key] ?? match);
-}
 
 export async function runOnCompleteHook(
   hookConfig: OnCompleteConfig,
