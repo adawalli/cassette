@@ -44,10 +44,6 @@ export function markdownPathFor(filePath: string, markdownSuffix: string): strin
   return `${filePath.slice(0, -ext.length)}${markdownSuffix}`;
 }
 
-export function isJsonPath(filePath: string): boolean {
-  return path.extname(filePath).toLowerCase() === ".json";
-}
-
 export function isVttPath(filePath: string): boolean {
   return path.extname(filePath).toLowerCase() === ".vtt";
 }
@@ -59,6 +55,15 @@ export function isInFailedDirectory(filePath: string, failedDirName: string): bo
 
 export function replaceTemplateVars(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => vars[key] ?? match);
+}
+
+export function resolveWatchedPath(
+  baseDir: string,
+  fileName: string | Buffer | null,
+): string | null {
+  if (!fileName) return null;
+  const rawName = typeof fileName === "string" ? fileName : fileName.toString("utf8");
+  return path.join(baseDir, rawName);
 }
 
 export async function walkDirectory(

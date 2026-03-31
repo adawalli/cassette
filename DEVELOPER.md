@@ -49,7 +49,7 @@ bun add -d <package>       # dev dep
 The `LlmClient` interface (`src/llm.ts`) is always injected, never imported directly in tests. To mock it:
 
 ```ts
-const mockLlm: LlmClient = { complete: async () => "mock output" };
+const mockLlm: LlmClient = { generate: async () => "mock output" };
 ```
 
 ## Adding a new transcript format

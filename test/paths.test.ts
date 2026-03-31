@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { markdownPathFor, isJsonPath, isVttPath, isInFailedDirectory } from "../src/paths";
+import { markdownPathFor, isVttPath, isInFailedDirectory } from "../src/paths";
 
 describe("markdownPathFor", () => {
   test("strips .json and appends suffix", () => {
@@ -20,20 +20,6 @@ describe("markdownPathFor", () => {
 
   test("appends suffix when extension is unknown", () => {
     expect(markdownPathFor("/tmp/meeting.txt", ".md")).toBe("/tmp/meeting.txt.md");
-  });
-});
-
-describe("isJsonPath", () => {
-  test("returns true for .json", () => {
-    expect(isJsonPath("/tmp/a.json")).toBe(true);
-  });
-
-  test("returns true for .JSON", () => {
-    expect(isJsonPath("/tmp/a.JSON")).toBe(true);
-  });
-
-  test("returns false for .vtt", () => {
-    expect(isJsonPath("/tmp/a.vtt")).toBe(false);
   });
 });
 

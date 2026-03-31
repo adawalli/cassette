@@ -104,12 +104,12 @@ describe("startRecursiveWatcher", () => {
     expect(received).toEqual([path.join(customRoot, "call.json")]);
   });
 
-  test("returned cleanup function calls watcher.close()", () => {
+  test("returned handle.stop() calls watcher.close()", () => {
     const config = makeConfig();
-    const cleanup = startRecursiveWatcher({ config, onFilePath: () => {} });
+    const handle = startRecursiveWatcher({ config, onFilePath: () => {} });
 
     expect(fakeClose).not.toHaveBeenCalled();
-    cleanup();
+    handle.stop();
     expect(fakeClose).toHaveBeenCalledTimes(1);
   });
 });

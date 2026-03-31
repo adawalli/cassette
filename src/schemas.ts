@@ -115,6 +115,7 @@ export const StepResultSchema = z.object({
   stepName: z.string().min(1),
   markdownPath: z.string().min(1),
   warnings: z.array(z.string()),
+  notify: z.boolean().default(false),
 });
 
 export const ProcessingSuccessSchema = z.object({
@@ -159,6 +160,8 @@ export type IntakeConfig = z.infer<typeof IntakeConfigSchema>;
 export type ResolvedTranscriberConfig = Omit<TranscriberConfig, "prompt" | "steps"> & {
   steps: StepConfig[];
 };
+
+export type ConfigWithIntake = ResolvedTranscriberConfig & { intake: IntakeConfig };
 
 export type AsyncHandle = {
   stop: () => void;

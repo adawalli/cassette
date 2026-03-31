@@ -3,10 +3,15 @@ import { runOnCompleteHook } from "./hooks";
 import { executeIntake, startIntakeWatcher } from "./intake";
 import type { LlmClient } from "./llm";
 import { logger } from "./logger";
-import { isInFailedDirectory, walkDirectory } from "./paths";
+import { isEnoent, isInFailedDirectory, walkDirectory } from "./paths";
 import { processTranscriptFile } from "./processor";
 import { SerialQueue } from "./queue";
-import type { AsyncHandle, ProcessingResult, ResolvedTranscriberConfig } from "./schemas";
+import type {
+  AsyncHandle,
+  ConfigWithIntake,
+  ProcessingResult,
+  ResolvedTranscriberConfig,
+} from "./schemas";
 import { startRecursiveWatcher } from "./watcher";
 
 type ServiceDeps = {
@@ -18,9 +23,6 @@ function logProcessingResult(filePath: string, result: ProcessingResult): void {
     if (result.stepResults && result.stepResults.length > 1) {
       for (const step of result.stepResults) {
         logger.info(`[processor] step "${step.stepName}": ${filePath} -> ${step.markdownPath}`);
-        if (step.warnings.length > 0) {
-          logger.warn(`[processor] step "${step.stepName}" warnings: ${step.warnings.join(" | ")}`);
-        }
       }
     } else {
       logger.info(`[processor] success: ${filePath} -> ${result.markdownPath}`);
@@ -62,9 +64,9 @@ async function fireOnCompleteHooks(
   const baseVars = { input: filePath, root_dir: config.watch.root_dir };
 
   if (result.stepResults && result.stepResults.length > 0) {
+    // Fire per-step hooks for steps that opted in to notifications.
     for (const stepResult of result.stepResults) {
-      const stepConfig = config.steps.find((s) => s.name === stepResult.stepName);
-      if (stepConfig?.notify) {
+      if (stepResult.notify) {
         await runOnCompleteHook(on_complete, {
           ...baseVars,
           output: stepResult.markdownPath,
@@ -75,36 +77,55 @@ async function fireOnCompleteHooks(
     }
   }
 
+  // Always fire the final completion hook so callers get a guaranteed "all done" signal.
   await runOnCompleteHook(on_complete, { ...baseVars, output: result.markdownPath });
 }
 
-export async function scanInputFiles(config: ResolvedTranscriberConfig): Promise<string[]> {
+export function scanInputFiles(config: ResolvedTranscriberConfig): Promise<string[]> {
   const shouldProcess = createFileFilter(config);
   const failedDirName = config.failure.failed_dir_name;
 
   return walkDirectory(config.watch.root_dir, shouldProcess, (dirPath) =>
     isInFailedDirectory(dirPath, failedDirName),
-  );
+  ).catch((err) => {
+    if (isEnoent(err)) {
+      throw new Error(`Watch root_dir not found: ${config.watch.root_dir}`);
+    }
+    throw err;
+  });
+}
+
+function makeProcessAndLog(
+  config: ResolvedTranscriberConfig,
+  deps: ServiceDeps,
+): (filePath: string) => Promise<void> {
+  return async (filePath: string) => {
+    logger.info(`[processor] processing: ${filePath}`);
+    const result = await processTranscriptFile(filePath, config, {
+      llmClient: deps.llmClient,
+    });
+    logProcessingResult(filePath, result);
+    await fireOnCompleteHooks(filePath, result, config);
+  };
 }
 
 export async function runBackfill(
   config: ResolvedTranscriberConfig,
   deps: ServiceDeps,
 ): Promise<void> {
-  if (config.intake) {
-    await executeIntake(config);
-  }
   const queue = new SerialQueue();
+  const processAndLog = makeProcessAndLog(config, deps);
+
+  if (config.intake) {
+    const intakePaths = await executeIntake(config as ConfigWithIntake);
+    for (const filePath of intakePaths) {
+      queue.enqueue(() => processAndLog(filePath));
+    }
+  }
+
   const files = await scanInputFiles(config);
   for (const filePath of files) {
-    queue.enqueue(async () => {
-      logger.info(`[processor] processing: ${filePath}`);
-      const result = await processTranscriptFile(filePath, config, {
-        llmClient: deps.llmClient,
-      });
-      logProcessingResult(filePath, result);
-      await fireOnCompleteHooks(filePath, result, config);
-    });
+    queue.enqueue(() => processAndLog(filePath));
   }
   await queue.onIdle();
 }
@@ -115,6 +136,7 @@ export async function runService(
 ): Promise<AsyncHandle> {
   const queue = new SerialQueue();
   const pending = new Set<string>();
+  const processAndLog = makeProcessAndLog(config, deps);
 
   const enqueuePath = (filePath: string): void => {
     if (pending.has(filePath)) {
@@ -123,20 +145,17 @@ export async function runService(
     pending.add(filePath);
     queue.enqueue(async () => {
       try {
-        logger.info(`[processor] processing: ${filePath}`);
-        const result = await processTranscriptFile(filePath, config, {
-          llmClient: deps.llmClient,
-        });
-        logProcessingResult(filePath, result);
-        await fireOnCompleteHooks(filePath, result, config);
+        await processAndLog(filePath);
       } finally {
         pending.delete(filePath);
       }
     });
   };
 
-  if (config.intake) {
-    const intakeFiles = await executeIntake(config);
+  const configWithIntake = config.intake ? (config as ConfigWithIntake) : null;
+
+  if (configWithIntake) {
+    const intakeFiles = await executeIntake(configWithIntake);
     for (const filePath of intakeFiles) {
       enqueuePath(filePath);
     }
@@ -147,24 +166,20 @@ export async function runService(
     enqueuePath(filePath);
   }
 
-  const stopMainWatcher = startRecursiveWatcher({
-    config,
-    onFilePath: enqueuePath,
-  });
+  const mainWatcher = startRecursiveWatcher({ config, onFilePath: enqueuePath });
+  const intakeWatcher = configWithIntake
+    ? startIntakeWatcher({ config: configWithIntake, onIntake: enqueuePath })
+    : null;
 
-  if (config.intake) {
-    const intakeWatcher = startIntakeWatcher({ config, onIntake: enqueuePath });
-    return {
-      stop: () => {
-        intakeWatcher.stop();
-        stopMainWatcher();
-      },
-      onIdle: async () => {
-        await intakeWatcher.onIdle();
-        await queue.onIdle();
-      },
-    };
-  }
-
-  return { stop: stopMainWatcher, onIdle: () => queue.onIdle() };
+  return {
+    stop: () => {
+      mainWatcher.stop();
+      intakeWatcher?.stop();
+    },
+    onIdle: async () => {
+      await intakeWatcher?.onIdle();
+      await mainWatcher.onIdle();
+      await queue.onIdle();
+    },
+  };
 }

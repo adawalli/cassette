@@ -52,20 +52,20 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^25.3.0",
+    "@types/node": "^25.5.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.7",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.8.1"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "jsonpath-plus": "^10.4.0",
-    "openai": "^6.22.0",
+    "openai": "^6.33.0",
     "p-retry": "^7.1.1",
-    "picomatch": "^4.0.3",
-    "yaml": "^2.8.2",
+    "picomatch": "^4.0.4",
+    "yaml": "^2.8.3",
     "zod": "^4.3.6"
   }
 }
