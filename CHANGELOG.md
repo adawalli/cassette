@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.2](https://github.com/adawalli/cassette/compare/v0.6.1...v0.6.2) (2026-03-31)
+
+
+### Bug Fixes
+
+* exclude sleep.ts from coverage and add pre-push hook ([2fd9a6d](https://github.com/adawalli/cassette/commit/2fd9a6dd6c23a923376566bde947e44ee8651ccc))
+* exclude sleep.ts from coverage and add pre-push hook ([884f681](https://github.com/adawalli/cassette/commit/884f681d52b37a942ba7f74a55938575ad8970bc))
+
 ## [0.6.1](https://github.com/adawalli/cassette/compare/v0.6.0...v0.6.1) (2026-03-25)
 
 
