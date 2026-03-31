@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.1](https://github.com/adawalli/cassette/compare/v0.6.0...v0.6.1) (2026-03-25)
+
+
+### Bug Fixes
+
+* address PR [#45](https://github.com/adawalli/cassette/issues/45) review feedback ([8020399](https://github.com/adawalli/cassette/commit/8020399fb72b6b80212fcbb378ee6320e5c85121))
+* correct onIdle drain ordering, remove TOCTOU, consolidate handle types ([b8c0430](https://github.com/adawalli/cassette/commit/b8c043065294a55c94829348931195727247e59c))
+* improve error isolation, type safety, and test determinism ([ae76d59](https://github.com/adawalli/cassette/commit/ae76d593c118c48e6441442ac16a951df39bb8eb))
+* use consistent error formatting in executeIntake logging ([68cbaab](https://github.com/adawalli/cassette/commit/68cbaab15a216362960b720c7cea55f505f2872d))
+
 ## [0.6.0](https://github.com/adawalli/cassette/compare/v0.5.1...v0.6.0) (2026-03-23)
 
 
