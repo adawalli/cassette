@@ -45,6 +45,12 @@ describe("scanInputFiles", () => {
     expect(files.length).toBe(1);
     expect(files[0]?.endsWith("keep-me.json")).toBe(true);
   });
+
+  test("reports a missing root_dir with an actionable message", async () => {
+    await expect(scanInputFiles(config("/nonexistent/cassette-root"))).rejects.toThrow(
+      "Watch root_dir not found",
+    );
+  });
 });
 
 describe("runBackfill", () => {
@@ -276,37 +282,6 @@ describe("runService", () => {
   });
 });
 
-describe("logProcessingResult - multi-step with warnings", () => {
-  test("runBackfill with multi-step config logs step warnings", async () => {
-    const dir = await makeTempDir();
-    await writeFile(
-      path.join(dir, "a.json"),
-      JSON.stringify({ segments: [{ text: "hello" }] }),
-      "utf8",
-    );
-
-    // This LLM returns output that triggers warnings for single-step
-    // but for multi-step, warnings are always empty per processor logic.
-    // The real coverage for line 24 requires stepResults with non-empty warnings,
-    // which the current processor never produces for multi-step.
-    // We test the multi-step path that does get covered (lines 20-26 path).
-    const cfg: ResolvedTranscriberConfig = {
-      ...config(dir),
-      steps: [
-        { name: "clean", prompt: "clean it", suffix: ".cleaned.md", notify: false },
-        { name: "summarize", prompt: "summarize it", suffix: ".summary.md", notify: false },
-      ],
-    };
-
-    const llmClient: LlmClient = { generate: async () => "# output" };
-    await runBackfill(cfg, { llmClient });
-
-    // Verify both step outputs were created
-    expect(await fileExists(path.join(dir, "a.cleaned.md"))).toBe(true);
-    expect(await fileExists(path.join(dir, "a.summary.md"))).toBe(true);
-  });
-});
-
 describe("intake integration", () => {
   test("runBackfill with intake moves VTT from source and processes it", async () => {
     const sourceDir = await makeTempDir();
@@ -336,12 +311,18 @@ describe("intake integration", () => {
       },
     };
 
+    let generateCalls = 0;
     const llmClient: LlmClient = {
-      generate: async () => "# Standup Notes\n\nAlice said hello.",
+      generate: async () => {
+        generateCalls += 1;
+        return "# Standup Notes\n\nAlice said hello.";
+      },
     };
 
     await runBackfill(cfg, { llmClient });
 
+    // The intaken file also shows up in the root_dir scan; it must only be processed once
+    expect(generateCalls).toBe(1);
     // VTT should have been moved from source into a weekly subdir
     expect(await fileExists(path.join(sourceDir, "standup.vtt"))).toBe(false);
     // Find the VTT in the weekly subdirectory (YYYY/MM-DD/standup.vtt)

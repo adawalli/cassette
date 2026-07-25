@@ -3,7 +3,7 @@ import { runOnCompleteHook } from "./hooks";
 import { executeIntake, startIntakeWatcher } from "./intake";
 import type { LlmClient } from "./llm";
 import { logger } from "./logger";
-import { isEnoent, isInFailedDirectory, walkDirectory } from "./paths";
+import { isEnoent, walkDirectory } from "./paths";
 import { processTranscriptFile } from "./processor";
 import { SerialQueue } from "./queue";
 import type {
@@ -83,11 +83,8 @@ async function fireOnCompleteHooks(
 
 export function scanInputFiles(config: ResolvedTranscriberConfig): Promise<string[]> {
   const shouldProcess = createFileFilter(config);
-  const failedDirName = config.failure.failed_dir_name;
 
-  return walkDirectory(config.watch.root_dir, shouldProcess, (dirPath) =>
-    isInFailedDirectory(dirPath, failedDirName),
-  ).catch((err) => {
+  return walkDirectory(config.watch.root_dir, shouldProcess).catch((err) => {
     if (isEnoent(err)) {
       throw new Error(`Watch root_dir not found: ${config.watch.root_dir}`);
     }
@@ -116,14 +113,12 @@ export async function runBackfill(
   const queue = new SerialQueue();
   const processAndLog = makeProcessAndLog(config, deps);
 
-  if (config.intake) {
-    const intakePaths = await executeIntake(config as ConfigWithIntake);
-    for (const filePath of intakePaths) {
-      queue.enqueue(() => processAndLog(filePath));
-    }
+  // Intaken files land inside root_dir, so the scan below finds them again - dedupe.
+  const files = new Set(config.intake ? await executeIntake(config as ConfigWithIntake) : []);
+  for (const filePath of await scanInputFiles(config)) {
+    files.add(filePath);
   }
 
-  const files = await scanInputFiles(config);
   for (const filePath of files) {
     queue.enqueue(() => processAndLog(filePath));
   }
@@ -154,14 +149,12 @@ export async function runService(
 
   const configWithIntake = config.intake ? (config as ConfigWithIntake) : null;
 
-  if (configWithIntake) {
-    const intakeFiles = await executeIntake(configWithIntake);
-    for (const filePath of intakeFiles) {
-      enqueuePath(filePath);
-    }
+  // Intaken files land inside root_dir, so the scan below finds them again. Collect both
+  // before enqueuing: `pending` alone would miss a duplicate whose first run already finished.
+  const startupFiles = new Set(configWithIntake ? await executeIntake(configWithIntake) : []);
+  for (const filePath of await scanInputFiles(config)) {
+    startupFiles.add(filePath);
   }
-
-  const startupFiles = await scanInputFiles(config);
   for (const filePath of startupFiles) {
     enqueuePath(filePath);
   }

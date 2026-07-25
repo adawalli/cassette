@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { logger } from "./logger";
-import { replaceTemplateVars } from "./paths";
+import { errorMessage, replaceTemplateVars } from "./paths";
 import type { OnCompleteConfig } from "./schemas";
 
 export async function runOnCompleteHook(
@@ -23,6 +23,11 @@ export async function runOnCompleteHook(
 
   try {
     const exitCode = await new Promise<number>((resolve) => {
+      // An unhandled 'error' event is rethrown from the event loop and would kill the process.
+      proc.on("error", (err) => {
+        logger.warn(`[hooks] on_complete spawn failed: ${errorMessage(err)}`);
+        resolve(1);
+      });
       proc.on("exit", (code) => resolve(code ?? 1));
     });
 
@@ -34,7 +39,7 @@ export async function runOnCompleteHook(
       logger.warn(`[hooks] on_complete failed (exit ${exitCode}): ${command}${detail}`);
     }
   } catch (err) {
-    logger.warn(`[hooks] on_complete error: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn(`[hooks] on_complete error: ${errorMessage(err)}`);
   } finally {
     clearTimeout(timeoutHandle);
   }

@@ -2,7 +2,6 @@ import { describe, expect, spyOn, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { processTranscriptFile, applyStemStrip } from "../src/processor";
-import { waitForStableFile } from "../src/stable-wait";
 import type { LlmClient } from "../src/llm";
 import { logger } from "../src/logger";
 import { OutputConfigSchema, type ResolvedTranscriberConfig } from "../src/schemas";
@@ -63,19 +62,35 @@ describe("processTranscriptFile", () => {
     expect(result.status).toBe("skipped");
   });
 
-  test("returns warnings for weak markdown structure", async () => {
+  test("warns when output has no front matter", async () => {
     const dir = await makeTempDir();
     const jsonPath = path.join(dir, "meeting.json");
     await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
 
     const llmClient: LlmClient = {
-      generate: async () => "plain content without required sections",
+      generate: async () => "plain content without front matter",
     };
 
     const result = await processTranscriptFile(jsonPath, baseConfig(dir), { llmClient });
     expect(result.status).toBe("success");
     if (result.status === "success") {
-      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings).toEqual(["Missing YAML front matter block marker"]);
+    }
+  });
+
+  test("does not warn about sections a custom prompt never asked for", async () => {
+    const dir = await makeTempDir();
+    const jsonPath = path.join(dir, "meeting.json");
+    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+
+    const llmClient: LlmClient = {
+      generate: async () => "---\ntitle: Notes\n---\njust a paragraph",
+    };
+
+    const result = await processTranscriptFile(jsonPath, baseConfig(dir), { llmClient });
+    expect(result.status).toBe("success");
+    if (result.status === "success") {
+      expect(result.warnings).toEqual([]);
     }
   });
 
@@ -377,14 +392,14 @@ describe("processTranscriptFile - multi-step chaining", () => {
 
     // verify step 2 received step 1's output as its input
     expect(calls).toHaveLength(2);
-    expect(calls[0].prompt).toBe("clean the transcript");
-    expect(calls[1].prompt).toBe("summarize it");
-    expect(calls[1].input).toBe("cleaned output");
+    expect(calls[0]!.prompt).toBe("clean the transcript");
+    expect(calls[1]!.prompt).toBe("summarize it");
+    expect(calls[1]!.input).toBe("cleaned output");
 
     if (result.status === "success") {
       expect(result.stepResults).toHaveLength(2);
-      expect(result.stepResults![0].stepName).toBe("clean");
-      expect(result.stepResults![1].stepName).toBe("summarize");
+      expect(result.stepResults![0]!.stepName).toBe("clean");
+      expect(result.stepResults![1]!.stepName).toBe("summarize");
       // markdownPath should be the last step's output
       expect(result.markdownPath).toBe(summaryPath);
     }
@@ -430,9 +445,9 @@ describe("processTranscriptFile - multi-step chaining", () => {
 
     // only step 2 should have called LLM
     expect(calls).toHaveLength(1);
-    expect(calls[0].prompt).toBe("summarize it");
+    expect(calls[0]!.prompt).toBe("summarize it");
     // step 2's input should be the cached content from disk
-    expect(calls[0].input).toBe("cached clean output");
+    expect(calls[0]!.input).toBe("cached clean output");
 
     const summaryPath = path.join(dir, "meeting.summary.md");
     expect(await fileExists(summaryPath)).toBe(true);
@@ -521,17 +536,81 @@ describe("processTranscriptFile - multi-step chaining", () => {
 
     await processTranscriptFile(jsonPath, config, { llmClient });
     expect(capturedConfigs).toHaveLength(1);
-    expect(capturedConfigs[0].model).toBe("gpt-4o");
-    expect(capturedConfigs[0].temperature).toBe(0.9);
+    expect(capturedConfigs[0]!.model).toBe("gpt-4o");
+    expect(capturedConfigs[0]!.temperature).toBe(0.9);
     // other fields come from global config
-    expect(capturedConfigs[0].retries).toBe(1);
+    expect(capturedConfigs[0]!.retries).toBe(1);
+  });
+});
+
+const SIMPLE_LLM_OUTPUT =
+  "---\ndate: 2026-03-20\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
+const simpleLlm: LlmClient = { generate: async () => SIMPLE_LLM_OUTPUT };
+
+describe("copy_to failures do not quarantine a successful transcription", () => {
+  test("a broken copy_to leaves the source in place and still reports success", async () => {
+    const dir = await makeTempDir();
+    const vaultParent = await makeTempDir();
+    // copy_to points at an existing *file*, so mkdir fails with ENOTDIR
+    const notADir = path.join(vaultParent, "not-a-dir");
+    await writeFile(notADir, "x", "utf8");
+
+    const jsonPath = path.join(dir, "meeting.json");
+    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+
+    const base = baseConfig(dir);
+    const config: ResolvedTranscriberConfig = {
+      ...base,
+      output: { ...base.output, copy_to: notADir },
+    };
+
+    const result = await processTranscriptFile(jsonPath, config, { llmClient: simpleLlm });
+
+    expect(result.status).toBe("success");
+    expect(await fileExists(jsonPath)).toBe(true);
+    expect(await fileExists(path.join(dir, "_failed", "meeting.json"))).toBe(false);
+    expect(await fileExists(path.join(dir, "meeting.md"))).toBe(true);
+  });
+});
+
+describe("stripOuterCodeFence", () => {
+  test("strips a fenced markdown block wrapping the whole response", async () => {
+    const dir = await makeTempDir();
+    const jsonPath = path.join(dir, "meeting.json");
+    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+
+    const llmClient: LlmClient = {
+      generate: async () => "```markdown\n" + SIMPLE_LLM_OUTPUT + "\n```",
+    };
+    await processTranscriptFile(jsonPath, baseConfig(dir), { llmClient });
+
+    const md = await readFile(path.join(dir, "meeting.md"), "utf8");
+    expect(md.startsWith("---")).toBe(true);
+    expect(md.includes("```")).toBe(false);
+  });
+
+  test("leaves an unfenced response untouched", async () => {
+    const dir = await makeTempDir();
+    const jsonPath = path.join(dir, "meeting.json");
+    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+
+    await processTranscriptFile(jsonPath, baseConfig(dir), { llmClient: simpleLlm });
+
+    expect(await readFile(path.join(dir, "meeting.md"), "utf8")).toBe(SIMPLE_LLM_OUTPUT);
   });
 });
 
 describe("stripDateFromStem - separator handling", () => {
-  const SIMPLE_LLM_OUTPUT =
-    "---\ndate: 2026-03-20\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
-  const simpleLlm: LlmClient = { generate: async () => SIMPLE_LLM_OUTPUT };
+  test("keeps the original stem when the filename is only a date", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = path.join(dir, "2026-07-20.json");
+    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir), { llmClient: simpleLlm });
+
+    expect(await fileExists(path.join(vaultDir, "2026-07-20 2026-07-20.md"))).toBe(true);
+  });
 
   test("strips leading date with underscore separator", async () => {
     const dir = await makeTempDir();
@@ -629,11 +708,13 @@ describe("copy_filename template", () => {
     const jsonPath = await writeTestJson(dir, "2026-03-20_weekly-standup.json");
 
     const llmClient: LlmClient = { generate: async () => "## Summary\nJust plain markdown." };
-    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{date}} {{title}}"), {
+    // {{title}} alone: default naming could never produce this filename, so the template
+    // path really did run.
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{title}}"), {
       llmClient,
     });
 
-    expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
+    expect(await fileExists(path.join(vaultDir, "weekly-standup.md"))).toBe(true);
   });
 
   test("{{title}} falls back to {{stem}} when front matter has no title field", async () => {
@@ -644,11 +725,11 @@ describe("copy_filename template", () => {
     const llmClient: LlmClient = {
       generate: async () => "---\ndate: 2026-03-20\ntags: [meeting]\n---\n## Summary\nx",
     };
-    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{date}} {{title}}"), {
+    await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir, "{{title}}"), {
       llmClient,
     });
 
-    expect(await fileExists(path.join(vaultDir, "2026-03-20 weekly-standup.md"))).toBe(true);
+    expect(await fileExists(path.join(vaultDir, "weekly-standup.md"))).toBe(true);
   });
 
   test("omitting copy_filename preserves default naming", async () => {
@@ -867,10 +948,6 @@ describe("stem_strip schema validation", () => {
 });
 
 describe("stem_strip integration", () => {
-  const SIMPLE_LLM_OUTPUT =
-    "---\ndate: 2026-03-20\n---\n## Summary\nx\n## Decisions\n- d\n## Action Items\n- [ ] x\n## Notes\nhello";
-  const simpleLlm: LlmClient = { generate: async () => SIMPLE_LLM_OUTPUT };
-
   test("stem_strip removes hash suffix from copied filename", async () => {
     const dir = await makeTempDir();
     const vaultDir = await makeTempDir();
@@ -910,15 +987,5 @@ describe("stem_strip integration", () => {
     await processTranscriptFile(jsonPath, config, { llmClient: simpleLlm });
 
     expect(await fileExists(path.join(vaultDir, "2026-03-20 team-sync.md"))).toBe(true);
-  });
-});
-
-describe("waitForStableFile", () => {
-  test("resolves when file is stable", async () => {
-    const dir = await makeTempDir();
-    const filePath = path.join(dir, "stable.json");
-    await writeFile(filePath, "content", "utf8");
-    // stableWindowMs=0 means it returns as soon as it sees the same signature twice
-    await expect(waitForStableFile(filePath, 0, 50)).resolves.toBeUndefined();
   });
 });

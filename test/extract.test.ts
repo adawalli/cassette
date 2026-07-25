@@ -25,6 +25,7 @@ describe("extractTranscriptUnits", () => {
     const input = { lines: ["first line", "second line"] };
     const units = extractTranscriptUnits(input, {
       path: "$.lines[*]",
+      speaker_field: "speaker",
       text_field: "text",
     });
     expect(units[0]?.text).toBe("first line");
@@ -37,6 +38,7 @@ describe("extractTranscriptUnits", () => {
         { items: [] },
         {
           path: "$.missing[*]",
+          speaker_field: "speaker",
           text_field: "text",
         },
       ),

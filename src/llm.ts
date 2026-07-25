@@ -13,61 +13,16 @@ function getTextContent(content: unknown): string {
   if (typeof content === "string") {
     return content.trim();
   }
+  // Some OpenAI-compatible backends return an array of content parts instead of a string.
   if (Array.isArray(content)) {
     return content.map(getTextFromContentPart).join("").trim();
-  }
-  if (typeof content === "object" && content !== null) {
-    return getTextFromContentPart(content).trim();
   }
   return "";
 }
 
 function getTextFromContentPart(part: unknown): string {
-  if (typeof part !== "object" || part === null) {
-    return "";
-  }
-
-  const candidate = part as { text?: unknown; content?: unknown; value?: unknown };
-  if (typeof candidate.text === "string") {
-    return candidate.text;
-  }
-  if (
-    typeof candidate.text === "object" &&
-    candidate.text !== null &&
-    "value" in candidate.text &&
-    typeof (candidate.text as { value?: unknown }).value === "string"
-  ) {
-    return ((candidate.text as { value?: string }).value ?? "").trim();
-  }
-  if (typeof candidate.content === "string") {
-    return candidate.content;
-  }
-  if (typeof candidate.value === "string") {
-    return candidate.value;
-  }
-  return "";
-}
-
-function summarizeChoice(choice: unknown): string {
-  if (typeof choice !== "object" || choice === null) {
-    return "choice=missing";
-  }
-
-  const item = choice as {
-    finish_reason?: unknown;
-    message?: { content?: unknown; refusal?: unknown } | null;
-  };
-  const message = item.message ?? undefined;
-  const contentKind = Array.isArray(message?.content) ? "array" : typeof message?.content;
-  const contentLength = getTextContent(message?.content).length;
-  const refusalLength = typeof message?.refusal === "string" ? message.refusal.trim().length : 0;
-
-  return [
-    `finish_reason=${String(item.finish_reason ?? "unknown")}`,
-    `content_kind=${contentKind}`,
-    `content_text_len=${contentLength}`,
-    `refusal_len=${refusalLength}`,
-  ].join(", ");
+  const text = (part as { text?: unknown } | null)?.text;
+  return typeof text === "string" ? text : "";
 }
 
 function isRetryable(error: unknown): boolean {
@@ -108,7 +63,9 @@ export function createOpenAILlmClient(env: NodeJS.ProcessEnv = process.env): Llm
         const choice = response.choices[0];
         const content = getTextContent(choice?.message?.content);
         if (!content) {
-          throw new Error(`LLM response did not include text content (${summarizeChoice(choice)})`);
+          throw new Error(
+            `LLM response did not include text content (finish_reason=${choice?.finish_reason ?? "unknown"}, refusal=${choice?.message?.refusal ?? "none"})`,
+          );
         }
         return content;
       };

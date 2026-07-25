@@ -1,6 +1,7 @@
 import { watch } from "node:fs";
 import { createFileFilter } from "./file-filter";
-import { resolveWatchedPath } from "./paths";
+import { logger } from "./logger";
+import { errorMessage, resolveWatchedPath } from "./paths";
 import type { AsyncHandle, ResolvedTranscriberConfig } from "./schemas";
 
 export type WatcherOptions = {
@@ -24,6 +25,14 @@ export function startRecursiveWatcher(options: WatcherOptions): AsyncHandle {
       options.onFilePath(fullPath);
     },
   );
+
+  // An unhandled 'error' event would take the whole daemon down (e.g. EMFILE, or the
+  // watched directory being removed).
+  watcher.on("error", (err) => {
+    logger.error(
+      `[watcher] ${options.config.watch.root_dir} stopped watching: ${errorMessage(err)}`,
+    );
+  });
 
   return { stop: () => watcher.close(), onIdle: () => Promise.resolve() };
 }

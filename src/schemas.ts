@@ -53,7 +53,7 @@ export const LlmConfigSchema = z.object({
   base_url: z.string().url().default("https://api.openai.com/v1/"),
   model: z.string().min(1).default("gpt-4o"),
   temperature: z.number().min(0).max(2).default(0.1),
-  max_tokens: z.number().int().positive().default(4000),
+  max_tokens: z.number().int().positive().default(12000),
   timeout_ms: z.number().int().positive().default(120000),
   retries: z.number().int().min(0).default(5),
   retry_delay_ms: z.number().int().min(0).default(5000),
@@ -61,8 +61,8 @@ export const LlmConfigSchema = z.object({
 
 export const TranscriptConfigSchema = z.object({
   path: z.string().min(1).default("$[*]"),
-  speaker_field: z.string().min(1).optional(),
-  text_field: z.string().min(1).optional(),
+  speaker_field: z.string().min(1).default("speaker"),
+  text_field: z.string().min(1).default("text"),
 });
 
 export const OnCompleteConfigSchema = z.object({
@@ -75,7 +75,7 @@ export const StepConfigSchema = z.object({
   prompt: z.string().min(1),
   suffix: z.string().min(1).optional(),
   llm: LlmConfigSchema.partial().optional(),
-  notify: z.boolean().default(false),
+  notify: z.boolean().optional(),
 });
 
 export const IntakeConfigSchema = z.object({
@@ -88,10 +88,10 @@ export const IntakeConfigSchema = z.object({
 export const TranscriberConfigSchema = z
   .object({
     watch: WatchConfigSchema,
-    output: OutputConfigSchema.optional().default(OutputConfigSchema.parse({})),
-    failure: FailureConfigSchema.optional().default(FailureConfigSchema.parse({})),
-    llm: LlmConfigSchema.optional().default(LlmConfigSchema.parse({})),
-    transcript: TranscriptConfigSchema,
+    output: OutputConfigSchema.default(OutputConfigSchema.parse({})),
+    failure: FailureConfigSchema.default(FailureConfigSchema.parse({})),
+    llm: LlmConfigSchema.default(LlmConfigSchema.parse({})),
+    transcript: TranscriptConfigSchema.default(TranscriptConfigSchema.parse({})),
     prompt: z.string().min(1).optional(),
     steps: z.array(StepConfigSchema).min(1).optional(),
     on_complete: OnCompleteConfigSchema.optional(),
@@ -105,58 +105,39 @@ export const EnvSchema = z.object({
   OPENAI_API_KEY: z.string().min(1),
 });
 
-export const TranscriptUnitSchema = z.object({
-  speaker: z.string().min(1).optional(),
-  text: z.string().min(1),
-  index: z.number().int().nonnegative(),
-});
-
-export const StepResultSchema = z.object({
-  stepName: z.string().min(1),
-  markdownPath: z.string().min(1),
-  warnings: z.array(z.string()),
-  notify: z.boolean().default(false),
-});
-
-export const ProcessingSuccessSchema = z.object({
-  status: z.literal("success"),
-  markdownPath: z.string().min(1),
-  warnings: z.array(z.string()),
-  stepResults: z.array(StepResultSchema).optional(),
-});
-
-export const ProcessingSkippedSchema = z.object({
-  status: z.literal("skipped"),
-  reason: z.literal("markdown_exists"),
-});
-
-export const ProcessingFailedSchema = z.object({
-  status: z.literal("failed"),
-  errorMessage: z.string().min(1),
-  errorLogPath: z.string().min(1).optional(),
-  quarantinedPath: z.string().min(1).optional(),
-  failedStep: z.string().optional(),
-});
-
-export const ProcessingResultSchema = z.union([
-  ProcessingSuccessSchema,
-  ProcessingSkippedSchema,
-  ProcessingFailedSchema,
-]);
-
 export type TranscriberConfig = z.infer<typeof TranscriberConfigSchema>;
 export type TranscriptConfig = z.infer<typeof TranscriptConfigSchema>;
-export type TranscriptUnit = z.infer<typeof TranscriptUnitSchema>;
-export type ProcessingResult = z.infer<typeof ProcessingResultSchema>;
 export type LlmConfig = z.infer<typeof LlmConfigSchema>;
 export type StepConfig = z.infer<typeof StepConfigSchema>;
-export type StepResult = z.infer<typeof StepResultSchema>;
 export type OnCompleteConfig = z.infer<typeof OnCompleteConfigSchema>;
+export type IntakeConfig = z.infer<typeof IntakeConfigSchema>;
+
+// Everything below is constructed internally, never parsed from user input, so it is a plain type.
+export type TranscriptUnit = {
+  speaker?: string;
+  text: string;
+  index: number;
+};
+
+export type StepResult = {
+  stepName: string;
+  markdownPath: string;
+  notify?: boolean;
+};
+
+export type ProcessingResult =
+  | { status: "success"; markdownPath: string; warnings: string[]; stepResults?: StepResult[] }
+  | { status: "skipped"; reason: "markdown_exists" }
+  | {
+      status: "failed";
+      errorMessage: string;
+      errorLogPath?: string;
+      quarantinedPath?: string;
+      failedStep?: string;
+    };
 
 // ResolvedTranscriberConfig is the shape after normalization in loadConfig.
 // It always has `steps` and never has `prompt`.
-export type IntakeConfig = z.infer<typeof IntakeConfigSchema>;
-
 export type ResolvedTranscriberConfig = Omit<TranscriberConfig, "prompt" | "steps"> & {
   steps: StepConfig[];
 };

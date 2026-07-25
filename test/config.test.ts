@@ -10,6 +10,7 @@ import {
   resolveConfigPath,
 } from "../src/config";
 import { OnCompleteConfigSchema, TranscriberConfigSchema } from "../src/schemas";
+import { parse as parseYaml } from "yaml";
 
 const tempDirs: string[] = [];
 
@@ -67,8 +68,18 @@ describe("loadConfig", () => {
   test("throws on invalid schema", async () => {
     const dir = await makeTempDir();
     const configPath = path.join(dir, "config.yaml");
-    await writeFile(configPath, "watch:\n  root_dir: /tmp\nprompt: x\n", "utf8");
+    // watch.root_dir is required and has no default
+    await writeFile(configPath, "watch: {}\nprompt: x\n", "utf8");
     await expect(loadConfig(configPath)).rejects.toThrow();
+  });
+
+  test("loads a config with only root_dir and prompt", async () => {
+    const dir = await makeTempDir();
+    const configPath = path.join(dir, "config.yaml");
+    await writeFile(configPath, "watch:\n  root_dir: /tmp\nprompt: x\n", "utf8");
+    const config = await loadConfig(configPath);
+    expect(config.transcript.path).toBe("$[*]");
+    expect(config.steps[0]!.prompt).toBe("x");
   });
 
   test("supports loading from XDG default location", async () => {
@@ -117,6 +128,25 @@ describe("loadConfig tilde expansion", () => {
     const config = await loadConfig(configPath);
     expect(config.watch.root_dir).not.toContain("~");
     expect(config.watch.root_dir).toBe(path.join(os.homedir(), "Documents/meetings"));
+  });
+
+  test("expands tilde in intake.source_dir", async () => {
+    const dir = await makeTempDir();
+    const configPath = path.join(dir, "config.yaml");
+    await writeFile(
+      configPath,
+      [
+        "watch:",
+        "  root_dir: /tmp/meetings",
+        "intake:",
+        "  source_dir: ~/Downloads",
+        "prompt: hi",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const config = await loadConfig(configPath);
+    expect(config.intake!.source_dir).toBe(path.join(os.homedir(), "Downloads"));
   });
 
   test("leaves absolute root_dir unchanged", async () => {
@@ -168,8 +198,8 @@ describe("normalizeSteps", () => {
     const config = makeBase();
     const resolved = normalizeSteps(config);
     expect(resolved.steps).toHaveLength(1);
-    expect(resolved.steps[0].name).toBe("default");
-    expect(resolved.steps[0].prompt).toBe("clean this");
+    expect(resolved.steps[0]!.name).toBe("default");
+    expect(resolved.steps[0]!.prompt).toBe("clean this");
     expect("prompt" in resolved).toBe(false);
   });
 
@@ -184,8 +214,8 @@ describe("normalizeSteps", () => {
     });
     const resolved = normalizeSteps(config);
     expect(resolved.steps).toHaveLength(2);
-    expect(resolved.steps[0].name).toBe("clean");
-    expect(resolved.steps[1].name).toBe("summarize");
+    expect(resolved.steps[0]!.name).toBe("clean");
+    expect(resolved.steps[1]!.name).toBe("summarize");
   });
 
   test("duplicate suffix across steps throws", () => {
@@ -195,6 +225,18 @@ describe("normalizeSteps", () => {
       steps: [
         { name: "first", prompt: "do first", suffix: ".cleaned.md" },
         { name: "second", prompt: "do second", suffix: ".cleaned.md" },
+      ],
+    });
+    expect(() => normalizeSteps(config)).toThrow("Duplicate step suffix");
+  });
+
+  test("a step whose suffix equals output.markdown_suffix collides with the default step", () => {
+    const config = TranscriberConfigSchema.parse({
+      watch: { root_dir: "/tmp/meetings" },
+      transcript: { path: "$.segments[*]" },
+      steps: [
+        { name: "clean", prompt: "do first" },
+        { name: "summary", prompt: "do second", suffix: ".md" },
       ],
     });
     expect(() => normalizeSteps(config)).toThrow("Duplicate step suffix");
@@ -219,8 +261,8 @@ describe("normalizeSteps", () => {
       steps: [{ name: "clean", prompt: "clean it", llm: { model: "gpt-4o", temperature: 0.5 } }],
     });
     const resolved = normalizeSteps(config);
-    expect(resolved.steps[0].llm?.model).toBe("gpt-4o");
-    expect(resolved.steps[0].llm?.temperature).toBe(0.5);
+    expect(resolved.steps[0]!.llm?.model).toBe("gpt-4o");
+    expect(resolved.steps[0]!.llm?.temperature).toBe(0.5);
   });
 });
 
@@ -275,8 +317,8 @@ describe("loadConfig normalization", () => {
     );
     const config = await loadConfig(configPath);
     expect(config.steps).toHaveLength(1);
-    expect(config.steps[0].name).toBe("default");
-    expect(config.steps[0].prompt).toBe("hello");
+    expect(config.steps[0]!.name).toBe("default");
+    expect(config.steps[0]!.prompt).toBe("hello");
     expect("prompt" in config).toBe(false);
   });
 
@@ -302,8 +344,8 @@ describe("loadConfig normalization", () => {
     );
     const config = await loadConfig(configPath);
     expect(config.steps).toHaveLength(2);
-    expect(config.steps[0].suffix).toBe(".cleaned.md");
-    expect(config.steps[1].suffix).toBe(".summary.md");
+    expect(config.steps[0]!.suffix).toBe(".cleaned.md");
+    expect(config.steps[1]!.suffix).toBe(".summary.md");
   });
 });
 
@@ -346,13 +388,13 @@ describe("on_complete schema", () => {
 });
 
 describe("step notify field", () => {
-  test("notify defaults to false", () => {
+  test("notify is absent when omitted", () => {
     const result = TranscriberConfigSchema.parse({
       watch: { root_dir: "/tmp/meetings" },
       transcript: { path: "$.segments[*]" },
       steps: [{ name: "clean", prompt: "clean it" }],
     });
-    expect(result.steps?.[0]?.notify).toBe(false);
+    expect(result.steps?.[0]?.notify).toBeUndefined();
   });
 
   test("notify: true is preserved", () => {
@@ -394,5 +436,16 @@ describe("initConfigFile", () => {
     expect(second).toBe("overwritten");
     const overwritten = await readFile(configPath, "utf8");
     expect(overwritten).toBe(DEFAULT_CONFIG_YAML);
+  });
+});
+
+describe("shipped config templates", () => {
+  test("DEFAULT_CONFIG_YAML parses against the schema", () => {
+    expect(TranscriberConfigSchema.safeParse(parseYaml(DEFAULT_CONFIG_YAML)).success).toBe(true);
+  });
+
+  test("config.example.yaml parses against the schema", async () => {
+    const text = await readFile(path.join(import.meta.dir, "..", "config.example.yaml"), "utf8");
+    expect(TranscriberConfigSchema.safeParse(parseYaml(text)).success).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import path from "node:path";
+import { logger } from "../src/logger";
 import type { ResolvedTranscriberConfig } from "../src/schemas";
 import { baseConfig } from "./helpers";
 
@@ -7,12 +8,18 @@ import { baseConfig } from "./helpers";
 type WatchListener = (eventType: string, filename: string | Buffer | null) => void;
 
 let capturedListener: WatchListener;
+let capturedOnError: (err: unknown) => void;
 const fakeClose = mock(() => {});
 
 mock.module("node:fs", () => ({
   watch: (_dir: string, _opts: unknown, listener: WatchListener) => {
     capturedListener = listener;
-    return { close: fakeClose };
+    return {
+      close: fakeClose,
+      on: (event: string, handler: (err: unknown) => void) => {
+        if (event === "error") capturedOnError = handler;
+      },
+    };
   },
 }));
 
@@ -111,5 +118,17 @@ describe("startRecursiveWatcher", () => {
     expect(fakeClose).not.toHaveBeenCalled();
     handle.stop();
     expect(fakeClose).toHaveBeenCalledTimes(1);
+  });
+
+  test("logs watcher errors instead of letting them crash the process", () => {
+    const errorSpy = spyOn(logger, "error").mockImplementation(() => {});
+    try {
+      startRecursiveWatcher({ config: makeConfig(), onFilePath: () => {} });
+      capturedOnError(new Error("EMFILE: too many open files"));
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(String(errorSpy.mock.calls[0]![0])).toContain("EMFILE");
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });

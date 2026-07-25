@@ -54,9 +54,6 @@ describe("SerialQueue", () => {
   });
 
   test("onIdle on empty queue resolves immediately", async () => {
-    const queue = new SerialQueue();
-    await queue.onIdle();
-    // if we get here without hanging, the test passes
-    expect(true).toBe(true);
+    await expect(new SerialQueue().onIdle()).resolves.toBeUndefined();
   });
 });

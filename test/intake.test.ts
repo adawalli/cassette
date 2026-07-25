@@ -4,7 +4,7 @@ import path from "node:path";
 import { intakeFile, executeIntake, startIntakeWatcher, weekSubpath } from "../src/intake";
 import { logger } from "../src/logger";
 import { IntakeConfigSchema, TranscriberConfigSchema } from "../src/schemas";
-import type { ResolvedTranscriberConfig } from "../src/schemas";
+import type { ConfigWithIntake } from "../src/schemas";
 import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
 
 installTempDirCleanup();
@@ -13,7 +13,7 @@ function intakeConfig(
   rootDir: string,
   sourceDir: string,
   overrides?: Partial<{ delete_source: boolean; include_glob: string; exclude_glob: string[] }>,
-): ResolvedTranscriberConfig {
+): ConfigWithIntake {
   return {
     ...baseConfig(rootDir, {
       intake: {
@@ -107,6 +107,17 @@ describe("intakeFile", () => {
 });
 
 describe("executeIntake", () => {
+  test("never re-intakes files that already live under root_dir", async () => {
+    const sourceDir = await makeTempDir();
+    const rootDir = path.join(sourceDir, "meetings", "2026", "07-20");
+    await mkdir(rootDir, { recursive: true });
+    await writeFile(path.join(rootDir, "already-here.vtt"), "WEBVTT\n\nhello", "utf8");
+
+    const cfg = intakeConfig(path.join(sourceDir, "meetings"), sourceDir);
+    expect(await executeIntake(cfg)).toEqual([]);
+    expect(await fileExists(path.join(rootDir, "already-here.vtt"))).toBe(true);
+  });
+
   test("only moves files matching include_glob", async () => {
     const sourceDir = await makeTempDir();
     const rootDir = await makeTempDir();
@@ -176,45 +187,6 @@ describe("intakeFile - file gone", () => {
   });
 });
 
-describe("intakeFile - cross-device move fallback", () => {
-  test("moveFile falls back to copy+unlink when rename fails across volumes", async () => {
-    // This tests the moveFile catch branch (lines 28-29).
-    // On the same filesystem rename works, so we test the copy path
-    // by verifying the normal move behavior still works correctly.
-    const sourceDir = await makeTempDir();
-    const rootDir = await makeTempDir();
-    const srcFile = path.join(sourceDir, "test.vtt");
-    await writeFile(srcFile, "WEBVTT\n\nmove test", "utf8");
-
-    const cfg = intakeConfig(rootDir, sourceDir, { delete_source: true });
-    const dest = await intakeFile(srcFile, cfg);
-
-    expect(await fileExists(dest)).toBe(true);
-    expect(await fileExists(srcFile)).toBe(false);
-    expect(await readFile(dest, "utf8")).toBe("WEBVTT\n\nmove test");
-  });
-});
-
-describe("createIntakeFilter - file outside source_dir", () => {
-  test("rejects files outside the source directory", async () => {
-    const sourceDir = await makeTempDir();
-    const rootDir = await makeTempDir();
-    const otherDir = await makeTempDir();
-
-    // Put a file outside source_dir
-    await writeFile(path.join(otherDir, "outside.vtt"), "WEBVTT\n\nhello", "utf8");
-    // Put a file inside source_dir
-    await writeFile(path.join(sourceDir, "inside.vtt"), "WEBVTT\n\nhello", "utf8");
-
-    const cfg = intakeConfig(rootDir, sourceDir);
-    const results = await executeIntake(cfg);
-
-    // Only the file inside source_dir should be intaked
-    expect(results).toHaveLength(1);
-    expect(results[0]).toContain("inside.vtt");
-  });
-});
-
 describe("startIntakeWatcher", () => {
   test("returns a stop function that closes the watcher", async () => {
     const sourceDir = await makeTempDir();
@@ -223,18 +195,6 @@ describe("startIntakeWatcher", () => {
 
     const { stop } = startIntakeWatcher({ config: cfg, onIntake: () => {} });
     expect(typeof stop).toBe("function");
-    stop();
-  });
-
-  test("sets up the intake filter correctly", async () => {
-    const sourceDir = await makeTempDir();
-    const rootDir = await makeTempDir();
-    const cfg = intakeConfig(rootDir, sourceDir);
-
-    // Ensure the watcher can be created and torn down without errors
-    const intaked: string[] = [];
-    const { stop } = startIntakeWatcher({ config: cfg, onIntake: (p) => intaked.push(p) });
-    // Immediately stop - verifies initialization code runs without error
     stop();
   });
 });

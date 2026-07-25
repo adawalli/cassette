@@ -1,7 +1,7 @@
 import { describe, expect, mock, spyOn, test } from "bun:test";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ResolvedTranscriberConfig } from "../src/schemas";
+import type { ConfigWithIntake } from "../src/schemas";
 import { baseConfig, installTempDirCleanup, makeTempDir } from "./helpers";
 
 // Capture the watch listener so we can simulate fs events
@@ -14,7 +14,7 @@ const fakeClose = mock(() => {});
 mock.module("node:fs", () => ({
   watch: (_dir: string, _opts: unknown, listener: WatchListener) => {
     capturedListener = listener;
-    return { close: fakeClose };
+    return { close: fakeClose, on: () => {} };
   },
 }));
 
@@ -29,7 +29,7 @@ const { logger } = await import("../src/logger");
 
 installTempDirCleanup();
 
-function intakeWatcherConfig(rootDir: string, sourceDir: string): ResolvedTranscriberConfig {
+function intakeWatcherConfig(rootDir: string, sourceDir: string): ConfigWithIntake {
   return {
     ...baseConfig(rootDir, {
       intake: {

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import pkg from "../package.json";
 import { initConfigFile, loadConfig, resolveConfigPath } from "./config";
 import { createOpenAILlmClient } from "./llm";
@@ -100,21 +101,25 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
 
-  logger.info(`cassette v${VERSION}`);
-
   if (args.debug) {
     logger.setLevel("debug");
   }
 
+  logger.info(`cassette v${VERSION}`);
+
   const resolvedConfigPath = args.configPath ?? resolveConfigPath(process.env);
   let config;
   try {
-    config = await loadConfig(args.configPath);
+    config = await loadConfig(resolvedConfigPath);
   } catch (error) {
     if (isEnoent(error)) {
       throw new Error(
-        `Config not found at ${resolvedConfigPath}. Run 'bun run index.ts init' to create one.`,
+        `Config not found at ${resolvedConfigPath}. Run 'cassette init' to create one.`,
       );
+    }
+    if (error instanceof z.ZodError) {
+      // A raw ZodError dump is unreadable; show which keys are wrong.
+      throw new Error(`Invalid config at ${resolvedConfigPath}:\n${z.prettifyError(error)}`);
     }
     throw error;
   }
@@ -126,13 +131,22 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
 
-  const { stop } = await runService(config, { llmClient });
+  const { stop, onIdle } = await runService(config, { llmClient });
 
-  const shutdown = (): void => {
+  // Drain in-flight work so a signal cannot leave a half-written .md behind.
+  // A second signal gives up and exits immediately.
+  let shuttingDown = false;
+  const shutdown = async (): Promise<void> => {
+    if (shuttingDown) {
+      process.exit(1);
+    }
+    shuttingDown = true;
+    logger.info("shutting down, waiting for in-flight work...");
     stop();
+    await onIdle();
     process.exit(0);
   };
 
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", () => void shutdown());
+  process.on("SIGTERM", () => void shutdown());
 }

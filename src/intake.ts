@@ -3,7 +3,7 @@ import { watch } from "node:fs";
 import path from "node:path";
 import { createGlobFilter } from "./file-filter";
 import { logger } from "./logger";
-import { exists, resolveWatchedPath, walkDirectory } from "./paths";
+import { errorMessage, exists, resolveWatchedPath, walkDirectory } from "./paths";
 import { waitForStableFile } from "./stable-wait";
 import type { AsyncHandle, ConfigWithIntake } from "./schemas";
 
@@ -37,18 +37,25 @@ class FileGoneError extends Error {
 
 function logIntakeError(context: string, filePath: string, err: unknown): void {
   if (!(err instanceof FileGoneError)) {
-    logger.error(
-      `[intake] ${context} error for ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    logger.error(`[intake] ${context} error for ${filePath}: ${errorMessage(err)}`);
   }
 }
 
 function createIntakeFilter(config: ConfigWithIntake): (filePath: string) => boolean {
-  return createGlobFilter({
+  const matchesGlob = createGlobFilter({
     baseDir: config.intake.source_dir,
     includeGlob: config.intake.include_glob,
     excludeGlobs: config.intake.exclude_glob,
   });
+
+  return (filePath: string): boolean => {
+    // root_dir may sit inside source_dir - never re-intake what we already moved there.
+    const relToRoot = path.relative(config.watch.root_dir, filePath);
+    if (relToRoot && !relToRoot.startsWith("..") && !path.isAbsolute(relToRoot)) {
+      return false;
+    }
+    return matchesGlob(filePath);
+  };
 }
 
 export async function intakeFile(
@@ -62,12 +69,13 @@ export async function intakeFile(
   await waitForStableFile(filePath, config.watch.stable_window_ms);
 
   const { intake } = config;
+  const at = now();
   const fileName = path.basename(filePath);
-  const destDir = path.join(config.watch.root_dir, weekSubpath(now()));
+  const destDir = path.join(config.watch.root_dir, weekSubpath(at));
   let destPath = path.join(destDir, fileName);
 
   if (await exists(destPath)) {
-    const stamp = now().toISOString().replace(/[:.]/g, "-");
+    const stamp = at.toISOString().replace(/[:.]/g, "-");
     destPath = path.join(destDir, `${stamp}-${fileName}`);
   }
 
@@ -131,6 +139,11 @@ export function startIntakeWatcher(options: IntakeWatcherOptions): AsyncHandle {
       inflight.set(fullPath, p);
     },
   );
+
+  // An unhandled 'error' event would take the whole daemon down.
+  watcher.on("error", (err) => {
+    logger.error(`[intake] ${sourceDir} stopped watching: ${errorMessage(err)}`);
+  });
 
   return {
     stop: () => watcher.close(),

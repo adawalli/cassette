@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { markdownPathFor, isVttPath, isInFailedDirectory } from "../src/paths";
+import { markdownPathFor, isVttPath } from "../src/paths";
 
 describe("markdownPathFor", () => {
   test("strips .json and appends suffix", () => {
@@ -34,15 +34,5 @@ describe("isVttPath", () => {
 
   test("returns false for .json", () => {
     expect(isVttPath("/tmp/a.json")).toBe(false);
-  });
-});
-
-describe("isInFailedDirectory", () => {
-  test("returns true when path contains failed dir", () => {
-    expect(isInFailedDirectory("/tmp/_failed/a.json", "_failed")).toBe(true);
-  });
-
-  test("returns false when path does not contain failed dir", () => {
-    expect(isInFailedDirectory("/tmp/meetings/a.json", "_failed")).toBe(false);
   });
 });
