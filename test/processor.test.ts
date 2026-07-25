@@ -600,6 +600,26 @@ describe("stripOuterCodeFence", () => {
   });
 });
 
+describe("copyOutput collision", () => {
+  test("warns before overwriting an existing copy target", async () => {
+    const dir = await makeTempDir();
+    const vaultDir = await makeTempDir();
+    const jsonPath = path.join(dir, "2026-07-20 standup.json");
+    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+    const destPath = path.join(vaultDir, "2026-07-20 standup.md");
+    await writeFile(destPath, "older copy", "utf8");
+
+    const warnSpy = spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await processTranscriptFile(jsonPath, copyConfig(dir, vaultDir), { llmClient: simpleLlm });
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("copy target already exists"));
+    } finally {
+      warnSpy.mockRestore();
+    }
+    expect(await readFile(destPath, "utf8")).toBe(SIMPLE_LLM_OUTPUT);
+  });
+});
+
 describe("stripDateFromStem - separator handling", () => {
   test("keeps the original stem when the filename is only a date", async () => {
     const dir = await makeTempDir();

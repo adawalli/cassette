@@ -32,6 +32,15 @@ describe("extractTranscriptUnits", () => {
     expect(units[0]?.speaker).toBeUndefined();
   });
 
+  test("throws on a blank string transcript unit", () => {
+    expect(() =>
+      extractTranscriptUnits(
+        { lines: ["   "] },
+        { path: "$.lines[*]", speaker_field: "speaker", text_field: "text" },
+      ),
+    ).toThrow("Transcript text is empty at index 0");
+  });
+
   test("throws if JSONPath does not match", () => {
     expect(() =>
       extractTranscriptUnits(
