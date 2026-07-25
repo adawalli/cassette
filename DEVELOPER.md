@@ -78,23 +78,28 @@ Or pass `--debug` as a CLI flag.
 
 ## Publishing to npm
 
-The package is published as `@cassette-meetings/cli` under the `cassette-meetings` npm org. The release process is fully automated via two GitHub Actions workflows - you never manually bump versions or publish.
+The package is published as `@cassette-meetings/cli` under the `cassette-meetings` npm org. The release process is fully automated - you never manually bump versions or publish.
 
 ### How it works
 
-**`release-please.yml`** runs on every push to `main`. It analyzes commits since the last release and maintains an open "Release PR" (titled e.g. `chore(main): release 0.1.1`). That PR contains:
+**`publish.yml`** runs on every push to `main` and holds two jobs.
 
-- The version bump in `package.json`
-- An updated `CHANGELOG.md`
+The `release-please` job analyzes commits since the last release and maintains an open "Release PR" (titled e.g. `chore(main): release 0.1.1`) containing the version bump in `package.json` and an updated `CHANGELOG.md`.
 
-**`publish.yml`** triggers when release-please creates a GitHub Release (which happens automatically when the Release PR is merged). It runs tests, builds, and publishes to npm using OIDC (no tokens required).
+The `publish` job runs only when the first job reports `release_created` - that is, on the push that merges the Release PR. It typechecks, tests, builds, and publishes to npm using OIDC (no tokens required).
+
+Both live in one workflow because a GitHub Release created with the built-in `GITHUB_TOKEN` does not trigger other workflows, so a separate `on: release` publish job would never fire. The alternative is a personal access token, which expires silently and blocks every release until someone notices.
+
+The filename `publish.yml` is load-bearing: npm's trusted publisher config pins it. Renaming the file breaks the OIDC claim and every publish fails until the setting on npmjs.com is updated to match.
 
 ### Release flow
 
 1. Merge your PRs to `main` as normal
 2. release-please automatically opens/updates a Release PR - no action needed from you
 3. When you're ready to ship, review and merge the Release PR
-4. The GitHub Release and npm publish happen automatically
+4. Merging it pushes to `main`, which runs the workflow again - this time release-please cuts the GitHub Release and the publish job fires
+
+Note that the Release PR itself gets no CI checks. A PR opened by `GITHUB_TOKEN` cannot trigger workflows, and that PR only edits `package.json` and `CHANGELOG.md`. The publish job typechecks, tests, and builds before it publishes, so nothing ships untested.
 
 That's it. No manual version bumps, no manual tagging, no `npm publish` locally.
 

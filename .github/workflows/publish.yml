@@ -1,16 +1,38 @@
-name: Publish to npm
+name: Release and Publish
+
+# This file is named publish.yml because npm's trusted publisher config pins the workflow
+# filename. Renaming it breaks the OIDC claim and every publish fails until the setting on
+# npmjs.com is updated to match.
+#
+# release-please runs here rather than in its own workflow on purpose: a GitHub Release
+# created with GITHUB_TOKEN does not trigger other workflows, so a separate `on: release`
+# publish job would never fire. Running both in one workflow removes the need for a PAT.
 
 on:
-  release:
-    types: [published]
-
-permissions:
-  contents: read
-  id-token: write # Required for OIDC trusted publishing
+  push:
+    branches: [main]
 
 jobs:
-  publish:
+  release-please:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          release-type: node
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Required for OIDC trusted publishing
     steps:
       - uses: actions/checkout@v4
 
@@ -23,8 +45,12 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+          cache: true
 
       - run: bun install
+
+      # --ignore-scripts below skips prepublishOnly, so these are the only gates that run.
+      - run: bun run typecheck
 
       - run: bun test --coverage
 
