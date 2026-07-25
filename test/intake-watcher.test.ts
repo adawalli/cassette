@@ -8,13 +8,19 @@ import { baseConfig, installTempDirCleanup, makeTempDir } from "./helpers";
 type WatchListener = (eventType: string, filename: string | Buffer | null) => void;
 
 let capturedListener: WatchListener;
+let capturedOnError: (err: unknown) => void;
 const fakeClose = mock(() => {});
 
 // Mock node:fs to capture the watch listener (same pattern as watcher.test.ts)
 mock.module("node:fs", () => ({
   watch: (_dir: string, _opts: unknown, listener: WatchListener) => {
     capturedListener = listener;
-    return { close: fakeClose, on: () => {} };
+    return {
+      close: fakeClose,
+      on: (event: string, handler: (err: unknown) => void) => {
+        if (event === "error") capturedOnError = handler;
+      },
+    };
   },
 }));
 
@@ -207,6 +213,22 @@ describe("startIntakeWatcher (mocked fs.watch)", () => {
 
     expect(intaked).toHaveLength(1);
     expect(intaked[0]).toContain("buffer.vtt");
+  });
+
+  test("logs a watcher 'error' event instead of letting it kill the process", async () => {
+    const sourceDir = await makeTempDir();
+    const rootDir = await makeTempDir();
+    const cfg = intakeWatcherConfig(rootDir, sourceDir);
+
+    const errorSpy = spyOn(logger, "error").mockImplementation(() => {});
+    const { stop } = startIntakeWatcher({ config: cfg, onIntake: () => {} });
+    try {
+      capturedOnError(new Error("EMFILE: too many open files"));
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("stopped watching"));
+    } finally {
+      stop();
+      errorSpy.mockRestore();
+    }
   });
 
   test("returned cleanup function calls watcher.close()", async () => {
