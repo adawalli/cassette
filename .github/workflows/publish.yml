@@ -12,6 +12,13 @@ on:
   push:
     branches: [main]
 
+# Two pushes to main in quick succession would otherwise race on the Release PR, and with
+# publish in the same workflow, on npm itself. Never cancel in progress: a cancelled run
+# mid-`npm publish` is worse than a queued one.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release-please:
     runs-on: ubuntu-latest
