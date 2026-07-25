@@ -19,55 +19,55 @@ function defaultChatCreate() {
   });
 }
 
+class FakeOpenAI {
+  chat = {
+    completions: {
+      create: (...args: unknown[]) => {
+        createArgs.push(args[0] as Record<string, unknown>);
+        return chatCreateFn(...args);
+      },
+    },
+  };
+  constructor(opts: Record<string, unknown>) {
+    Object.assign(this, { _opts: opts });
+  }
+}
+
+// Stand-ins for the openai error classes. `src/llm.ts` only reads `status`/`headers` and
+// branches on `instanceof`, so these are the exact objects it sees under mock.module.
+class APIError extends Error {
+  status: number;
+  headers: Headers | undefined;
+  constructor(status: number, message: string, _error?: unknown, headers?: Headers) {
+    super(message);
+    this.status = status;
+    this.headers = headers;
+    this.name = "APIError";
+  }
+}
+
+class RateLimitError extends APIError {
+  constructor(message = "rate limited") {
+    super(429, message);
+    this.name = "RateLimitError";
+  }
+}
+
+class APIConnectionError extends Error {
+  constructor(message = "connection error") {
+    super(message);
+    this.name = "APIConnectionError";
+  }
+}
+
 // We need to mock 'openai' before importing the module under test.
 // Bun's mock.module hoists, so this runs before any import of 'openai'.
-mock.module("openai", () => {
-  class FakeOpenAI {
-    chat = {
-      completions: {
-        create: (...args: unknown[]) => {
-          createArgs.push(args[0] as Record<string, unknown>);
-          return chatCreateFn(...args);
-        },
-      },
-    };
-    constructor(opts: Record<string, unknown>) {
-      Object.assign(this, { _opts: opts });
-    }
-  }
-
-  class APIError extends Error {
-    status: number;
-    headers: Headers | undefined;
-    constructor(status: number, message: string, _error?: unknown, headers?: Headers) {
-      super(message);
-      this.status = status;
-      this.headers = headers;
-      this.name = "APIError";
-    }
-  }
-
-  class RateLimitError extends APIError {
-    constructor(message = "rate limited") {
-      super(429, message);
-      this.name = "RateLimitError";
-    }
-  }
-
-  class APIConnectionError extends Error {
-    constructor(message = "connection error") {
-      super(message);
-      this.name = "APIConnectionError";
-    }
-  }
-
-  return {
-    default: FakeOpenAI,
-    APIError,
-    RateLimitError,
-    APIConnectionError,
-  };
-});
+mock.module("openai", () => ({
+  default: FakeOpenAI,
+  APIError,
+  RateLimitError,
+  APIConnectionError,
+}));
 
 // Dynamic import so mock.module is applied first
 const { createOpenAILlmClient } = await import("../src/llm");
@@ -126,9 +126,9 @@ describe("generate - LLM configuration", () => {
     await client.generate("system prompt", "user transcript", config);
 
     expect(createArgs).toHaveLength(1);
-    expect(createArgs[0].model).toBe("gpt-4o-mini");
-    expect(createArgs[0].temperature).toBe(0.7);
-    expect(createArgs[0].max_tokens).toBe(1500);
+    expect(createArgs[0]!.model).toBe("gpt-4o-mini");
+    expect(createArgs[0]!.temperature).toBe(0.7);
+    expect(createArgs[0]!.max_tokens).toBe(1500);
   });
 
   test("sends system prompt and user message with correct roles", async () => {
@@ -137,7 +137,7 @@ describe("generate - LLM configuration", () => {
     await client.generate("You are a transcript cleaner", "Alice: Hello", baseLlmConfig());
 
     expect(createArgs).toHaveLength(1);
-    const messages = createArgs[0].messages as Array<{ role: string; content: string }>;
+    const messages = createArgs[0]!.messages as Array<{ role: string; content: string }>;
     expect(messages).toHaveLength(2);
     expect(messages[0]).toEqual({ role: "system", content: "You are a transcript cleaner" });
     expect(messages[1]).toEqual({ role: "user", content: "Alice: Hello" });
@@ -201,7 +201,6 @@ describe("generate - response text extraction", () => {
 
 describe("generate - retry behavior", () => {
   test("retries on RateLimitError then succeeds", async () => {
-    const { RateLimitError } = await import("openai");
     let callCount = 0;
 
     chatCreateFn = () => {
@@ -221,7 +220,6 @@ describe("generate - retry behavior", () => {
   });
 
   test("retries on APIConnectionError then succeeds", async () => {
-    const { APIConnectionError } = await import("openai");
     let callCount = 0;
 
     chatCreateFn = () => {
@@ -241,7 +239,6 @@ describe("generate - retry behavior", () => {
   });
 
   test("retries on generic APIError with status 429 (non-standard rate limit)", async () => {
-    const { APIError } = await import("openai");
     let callCount = 0;
 
     chatCreateFn = () => {
@@ -261,7 +258,6 @@ describe("generate - retry behavior", () => {
   });
 
   test("does NOT retry on 401 AuthenticationError - throws immediately", async () => {
-    const { APIError } = await import("openai");
     let callCount = 0;
 
     chatCreateFn = () => {
@@ -278,7 +274,6 @@ describe("generate - retry behavior", () => {
   });
 
   test("exhausts all retries and rethrows the last error", async () => {
-    const { RateLimitError } = await import("openai");
     let callCount = 0;
 
     chatCreateFn = () => {
@@ -294,7 +289,6 @@ describe("generate - retry behavior", () => {
   });
 
   test("sleeps for retry-after header duration (seconds) before retrying", async () => {
-    const { APIError } = await import("openai");
     let callCount = 0;
 
     chatCreateFn = () => {
@@ -315,7 +309,6 @@ describe("generate - retry behavior", () => {
   });
 
   test("sleeps for retry-after-ms header duration before retrying", async () => {
-    const { APIError } = await import("openai");
     let callCount = 0;
 
     chatCreateFn = () => {
@@ -341,7 +334,6 @@ describe("generate - retry behavior", () => {
   });
 
   test("retry-after-ms takes priority over retry-after when both present", async () => {
-    const { APIError } = await import("openai");
     let callCount = 0;
 
     chatCreateFn = () => {
@@ -369,7 +361,6 @@ describe("generate - retry behavior", () => {
   });
 
   test("does not sleep when retries are exhausted (retriesLeft === 0)", async () => {
-    const { RateLimitError } = await import("openai");
     let callCount = 0;
 
     chatCreateFn = () => {
@@ -388,7 +379,6 @@ describe("generate - retry behavior", () => {
   });
 
   test("falls back to backoff when retry-after header is malformed", async () => {
-    const { APIError } = await import("openai");
     let callCount = 0;
 
     chatCreateFn = () => {
@@ -416,7 +406,6 @@ describe("generate - retry behavior", () => {
   });
 
   test("falls back to exponential backoff when no retry-after header", async () => {
-    const { RateLimitError } = await import("openai");
     let callCount = 0;
 
     chatCreateFn = () => {

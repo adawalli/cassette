@@ -41,7 +41,8 @@ llm:
   temperature: 0.1
   max_tokens: 12000
   timeout_ms: 120000
-  retries: 3
+  retries: 5
+  retry_delay_ms: 5000
 
 # transcript settings are only used for JSON files.
 # VTT files are parsed natively and ignore this section.

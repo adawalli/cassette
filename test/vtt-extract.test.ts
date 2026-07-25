@@ -154,4 +154,17 @@ OK.
     expect(units[1]).toEqual({ speaker: "Bob", text: "Got it.", index: 1 });
     expect(units[2]).toEqual({ speaker: undefined, text: "OK.", index: 2 });
   });
+
+  test("treats a blank speaker tag as no speaker instead of throwing", () => {
+    const vtt = `WEBVTT
+
+1
+00:00:01.000 --> 00:00:03.000
+<v   >Nobody in particular said this.
+`;
+    const units = extractVttTranscriptUnits(vtt);
+    expect(units).toEqual([
+      { speaker: undefined, text: "Nobody in particular said this.", index: 0 },
+    ]);
+  });
 });

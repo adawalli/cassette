@@ -1,4 +1,4 @@
-import { TranscriptUnitSchema, type TranscriptUnit } from "./schemas";
+import type { TranscriptUnit } from "./schemas";
 
 const TIMESTAMP_RE = /^\d{2}:\d{2}:\d{2}\.\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}\.\d{3}/;
 const SPEAKER_TAG_RE = /^<v\s+([^>]+)>/;
@@ -23,7 +23,7 @@ function parseCueBlock(block: string): ParsedCue | null {
 
   const payload = payloadLines.join(" ");
   const speakerMatch = payload.match(SPEAKER_TAG_RE);
-  const speaker = speakerMatch ? speakerMatch[1].trim() : undefined;
+  const speaker = speakerMatch?.[1]?.trim() || undefined;
   const text = payload.replace(ALL_TAGS_RE, "").replace(/\s+/g, " ").trim();
   if (!text) return null;
 
@@ -59,13 +59,7 @@ export function extractVttTranscriptUnits(raw: string): TranscriptUnit[] {
 
   function flushCurrent(): void {
     if (current) {
-      merged.push(
-        TranscriptUnitSchema.parse({
-          speaker: current.speaker,
-          text: current.text,
-          index: merged.length,
-        }),
-      );
+      merged.push({ speaker: current.speaker, text: current.text, index: merged.length });
     }
   }
 

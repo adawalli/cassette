@@ -22,6 +22,6 @@ export async function waitForStableFile(
       previousSignature = signature;
       stableSince = null;
     }
-    await sleep(Math.max(50, pollMs));
+    await sleep(pollMs);
   }
 }

@@ -2,7 +2,12 @@ import { afterEach } from "bun:test";
 import { access, mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { IntakeConfig, OnCompleteConfig, ResolvedTranscriberConfig } from "../src/schemas";
+import type {
+  ConfigWithIntake,
+  IntakeConfig,
+  OnCompleteConfig,
+  ResolvedTranscriberConfig,
+} from "../src/schemas";
 
 const tempDirs: string[] = [];
 
@@ -43,12 +48,22 @@ export function copyConfig(
   };
 }
 
+type BaseConfigOverrides = {
+  on_complete?: OnCompleteConfig;
+  intake?: IntakeConfig;
+};
+
 export function baseConfig(
   rootDir: string,
-  overrides?: {
-    on_complete?: OnCompleteConfig;
-    intake?: IntakeConfig;
-  },
+  overrides: BaseConfigOverrides & { intake: IntakeConfig },
+): ConfigWithIntake;
+export function baseConfig(
+  rootDir: string,
+  overrides?: BaseConfigOverrides,
+): ResolvedTranscriberConfig;
+export function baseConfig(
+  rootDir: string,
+  overrides?: BaseConfigOverrides,
 ): ResolvedTranscriberConfig {
   return {
     watch: {
@@ -73,13 +88,14 @@ export function baseConfig(
       max_tokens: 4000,
       timeout_ms: 1000,
       retries: 1,
+      retry_delay_ms: 0,
     },
     transcript: {
       path: "$.segments[*]",
       speaker_field: "speaker",
       text_field: "text",
     },
-    steps: [{ name: "default", prompt: "test prompt" }],
+    steps: [{ name: "default", prompt: "test prompt", notify: false }],
     ...(overrides?.on_complete ? { on_complete: overrides.on_complete } : {}),
     ...(overrides?.intake ? { intake: overrides.intake } : {}),
   };

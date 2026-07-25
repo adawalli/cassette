@@ -2,37 +2,23 @@ import { copyFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/prom
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { extractTranscriptUnits, renderTranscript } from "./extract";
-import { replaceTemplateVars } from "./paths";
 import type { LlmClient } from "./llm";
 import { logger } from "./logger";
-import { exists, expandTilde, isVttPath, markdownPathFor } from "./paths";
+import {
+  errorMessage,
+  exists,
+  expandTilde,
+  isVttPath,
+  markdownPathFor,
+  replaceTemplateVars,
+} from "./paths";
 import { waitForStableFile } from "./stable-wait";
 import { extractVttTranscriptUnits } from "./vtt-extract";
-import {
-  ProcessingResultSchema,
-  type ProcessingResult,
-  type ResolvedTranscriberConfig,
-  type StepResult,
-} from "./schemas";
+import type { ProcessingResult, ResolvedTranscriberConfig, StepResult } from "./schemas";
 
 type ProcessorDeps = {
   llmClient: LlmClient;
-  now?: () => Date;
 };
-
-function collectMarkdownWarnings(markdown: string): string[] {
-  const warnings: string[] = [];
-  if (!/^---\r?\n/.test(markdown)) {
-    warnings.push("Missing YAML front matter block marker");
-  }
-  if (!markdown.includes("## Action Items")) {
-    warnings.push("Missing Action Items section");
-  }
-  if (!markdown.includes("## Decisions")) {
-    warnings.push("Missing Decisions section");
-  }
-  return warnings;
-}
 
 function formatErrorLog(error: unknown, now: Date): string {
   const message = errorMessage(error);
@@ -49,10 +35,6 @@ function formatErrorLog(error: unknown, now: Date): string {
   ]
     .filter(Boolean)
     .join("\n");
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function stripOuterCodeFence(text: string): string {
@@ -81,9 +63,10 @@ export function applyStemStrip(stem: string, patterns: string | string[]): strin
 }
 
 function stripDateFromStem(stem: string): string {
-  return stem
+  const stripped = stem
     .replace(/^\d{4}-\d{2}-\d{2}[\s_-]+/, "")
     .replace(/[_\-\s]*\d{4}-\d{2}-\d{2}(?=\.|$)/, "");
+  return stripped.trim() || stem;
 }
 
 function extractTitleFromMarkdown(markdown: string): string | undefined {
@@ -138,6 +121,9 @@ async function copyOutput(
 
   const destPath = path.join(destDir, destFilename);
   await mkdir(destDir, { recursive: true });
+  if (await exists(destPath)) {
+    logger.warn(`copy target already exists, overwriting: ${destPath}`);
+  }
   await copyFile(sourcePath, destPath);
   logger.info(`copied output: ${destPath}`);
 }
@@ -194,7 +180,7 @@ export async function processTranscriptFile(
   config: ResolvedTranscriberConfig,
   deps: ProcessorDeps,
 ): Promise<ProcessingResult> {
-  const now = deps.now ? deps.now() : new Date();
+  const now = new Date();
   const { steps } = config;
 
   const outputPaths = steps.map((step) =>
@@ -205,14 +191,11 @@ export async function processTranscriptFile(
     const existChecks = await Promise.all(outputPaths.map((p) => exists(p)));
     if (existChecks.every(Boolean)) {
       logger.debug(`skipping - all outputs exist: ${outputPaths.join(", ")}`);
-      return ProcessingResultSchema.parse({
-        status: "skipped",
-        reason: "markdown_exists",
-      });
+      return { status: "skipped", reason: "markdown_exists" };
     }
   }
 
-  let currentStepIndex = 0;
+  let currentStepIndex = -1;
   try {
     logger.info(
       `waiting for stable file ${filePath} (stable_window_ms=${config.watch.stable_window_ms})`,
@@ -259,15 +242,9 @@ export async function processTranscriptFile(
         logger.debug(`step "${step.name}" wrote output: ${outPath}`);
       }
 
-      const warnings = multiStep ? [] : collectMarkdownWarnings(stepOutput);
-      if (warnings.length > 0) {
-        logger.debug(`step "${step.name}" warnings: ${warnings.join(" | ")}`);
-      }
-
       stepResults.push({
         stepName: step.name,
         markdownPath: outPath,
-        warnings,
         notify: step.notify,
       });
       currentInput = stepOutput;
@@ -281,34 +258,44 @@ export async function processTranscriptFile(
       if (config.output.stem_strip) {
         stem = applyStemStrip(stem, config.output.stem_strip);
       }
-      const lastStepOutput = currentInput;
-      await copyOutput(
-        lastStep.markdownPath,
-        config.output.copy_to,
-        recordingDate,
-        stem,
-        config.output.copy_filename,
-        lastStepOutput,
-      );
+      // A copy failure must not quarantine a source whose transcription succeeded.
+      try {
+        await copyOutput(
+          lastStep.markdownPath,
+          config.output.copy_to,
+          recordingDate,
+          stem,
+          config.output.copy_filename,
+          currentInput,
+        );
+      } catch (copyErr) {
+        logger.warn(
+          `copy to ${config.output.copy_to} failed for ${filePath}: ${errorMessage(copyErr)}`,
+        );
+      }
     }
 
-    return ProcessingResultSchema.parse({
+    return {
       status: "success",
       markdownPath: lastStep.markdownPath,
-      warnings: multiStep ? [] : lastStep.warnings,
-      stepResults: multiStep ? stepResults : undefined,
-    });
+      // Front matter feeds {{title}} in copy_filename; without it naming silently degrades.
+      warnings:
+        multiStep || /^---\r?\n/.test(currentInput)
+          ? []
+          : ["Missing YAML front matter block marker"],
+      ...(multiStep ? { stepResults } : {}),
+    };
   } catch (error) {
     const failedStep = steps[currentStepIndex]?.name;
     logger.error(
-      `processing error for ${filePath} at step "${failedStep}": ${errorMessage(error)}`,
+      `processing error for ${filePath}${failedStep ? ` at step "${failedStep}"` : ""}: ${errorMessage(error)}`,
     );
     const quarantine = await quarantineFailure(filePath, config, error, now);
-    return ProcessingResultSchema.parse({
+    return {
       status: "failed",
       errorMessage: errorMessage(error),
-      failedStep,
+      ...(failedStep ? { failedStep } : {}),
       ...quarantine,
-    });
+    };
   }
 }

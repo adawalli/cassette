@@ -8,6 +8,10 @@ export function normalizeForGlob(filePath: string): string {
   return filePath.split(path.sep).join("/");
 }
 
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function isEnoent(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -48,11 +52,6 @@ export function isVttPath(filePath: string): boolean {
   return path.extname(filePath).toLowerCase() === ".vtt";
 }
 
-export function isInFailedDirectory(filePath: string, failedDirName: string): boolean {
-  const segments = filePath.split(path.sep);
-  return segments.includes(failedDirName);
-}
-
 export function replaceTemplateVars(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) => vars[key] ?? match);
 }
@@ -69,7 +68,6 @@ export function resolveWatchedPath(
 export async function walkDirectory(
   dir: string,
   filter: (filePath: string) => boolean,
-  skipDir?: (dirPath: string) => boolean,
 ): Promise<string[]> {
   const results: string[] = [];
 
@@ -78,9 +76,7 @@ export async function walkDirectory(
     for (const entry of entries) {
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
-        if (!skipDir || !skipDir(full)) {
-          await walk(full);
-        }
+        await walk(full);
       } else if (entry.isFile() && filter(full)) {
         results.push(full);
       }

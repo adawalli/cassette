@@ -42,7 +42,7 @@ llm:
   temperature: 0.1
   max_tokens: 12000
   timeout_ms: 120000
-  retries: 3
+  retries: 5
 
 transcript:
   path: "$[*]"
@@ -109,15 +109,13 @@ export async function initConfigFile(
 }
 
 export function normalizeSteps(config: TranscriberConfig): ResolvedTranscriberConfig {
-  const steps: StepConfig[] = config.steps
-    ? config.steps
-    : [{ name: "default", prompt: config.prompt!, notify: false }];
+  const steps: StepConfig[] = config.steps ?? [{ name: "default", prompt: config.prompt! }];
 
-  const suffixes = steps.map((s) => s.suffix ?? null);
+  const suffixes = steps.map((s) => s.suffix ?? config.output.markdown_suffix);
   if (new Set(suffixes).size < suffixes.length) {
     const dup = suffixes.find((s, i) => suffixes.indexOf(s) !== i);
     throw new Error(
-      `Duplicate step suffix: "${dup ?? "(default suffix)"}". Each step must produce a unique output file.`,
+      `Duplicate step suffix: "${dup}". Each step must produce a unique output file.`,
     );
   }
 
@@ -134,12 +132,12 @@ export async function loadConfig(configPath?: string): Promise<ResolvedTranscrib
   if (config.intake) {
     config.intake.source_dir = expandTilde(config.intake.source_dir);
   }
-  if (config.output?.copy_filename && !config.output?.copy_to) {
+  if (config.output.copy_filename && !config.output.copy_to) {
     logger.warn(
       "copy_filename is set but copy_to is not configured; the template will have no effect",
     );
   }
-  if (config.output?.stem_strip && !config.output?.copy_to) {
+  if (config.output.stem_strip && !config.output.copy_to) {
     logger.warn("stem_strip is set but copy_to is not configured; the pattern will have no effect");
   }
   return normalizeSteps(config);

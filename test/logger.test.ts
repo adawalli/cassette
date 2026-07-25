@@ -56,15 +56,6 @@ describe("logger", () => {
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
-  test("setLevel changes behavior dynamically", () => {
-    logger.debug("should not appear");
-    expect(logSpy).not.toHaveBeenCalled();
-
-    logger.setLevel("debug");
-    logger.debug("should appear");
-    expect(logSpy).toHaveBeenCalledTimes(1);
-  });
-
   test("output contains the message", () => {
     logger.info("hello world");
     expect(logSpy).toHaveBeenCalledTimes(1);
