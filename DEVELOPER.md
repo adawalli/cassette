@@ -13,11 +13,14 @@ cp .env.example .env   # fill in OPENAI_API_KEY
 bun test                          # run all tests
 bun test test/processor.test.ts   # run a single test file
 bun test --coverage               # run tests with coverage report
+bun run typecheck                 # tsc --noEmit
 bun run index.ts --help           # run from source
 bun run build                     # compile to dist/
 ```
 
-Coverage also runs automatically during `prepublishOnly`, so every npm publish includes a passing coverage check.
+CI and the pre-push hook both run `bun run typecheck` and `bun test --coverage`. Both also run during `prepublishOnly`, so every npm publish includes a passing typecheck and coverage check.
+
+`src/` must stay Node-compatible - the published artifact is bundled with `--target node` and a node shebang. Bun-only APIs (`Bun.file`, `Bun.write`, `Bun.Glob`) belong in `test/` only.
 
 ## Running from source vs. built output
 
@@ -42,7 +45,9 @@ bun add -d <package>       # dev dep
 
 ## Schemas and types
 
-`src/schemas.ts` is the single source of truth for config shape and result types. Any new config field goes there first - the Zod schema drives both runtime validation and TypeScript types.
+`src/schemas.ts` is the single source of truth for config shape and result types. Any new config field goes there first - the Zod schema drives both runtime validation and TypeScript types, so put the default in the schema rather than a `??` fallback at the use site.
+
+Zod is for parsing untrusted input (the YAML config, env vars). Values the code builds itself - `TranscriptUnit`, `StepResult`, `ProcessingResult` - are plain TypeScript types. Don't add `.parse()` calls to re-validate them; `tsc` already checks them and a runtime throw there turns a handled failure into an unhandled one.
 
 ## LLM in tests
 
@@ -55,7 +60,7 @@ const mockLlm: LlmClient = { generate: async () => "mock output" };
 ## Adding a new transcript format
 
 1. Add a parser in `src/` (e.g. `src/docx-extract.ts`) that returns `TranscriptUnit[]`
-2. Extend the file extension check in `src/processor.ts`
+2. Add the extension to `SUPPORTED_EXTENSIONS` in `src/paths.ts` and dispatch to the parser in `src/processor.ts`
 3. Update the `include_glob` default in `src/schemas.ts` if appropriate
 4. Add tests mirroring the pattern in `test/vtt-extract.test.ts`
 
@@ -78,6 +83,7 @@ The package is published as `@cassette-meetings/cli` under the `cassette-meeting
 ### How it works
 
 **`release-please.yml`** runs on every push to `main`. It analyzes commits since the last release and maintains an open "Release PR" (titled e.g. `chore(main): release 0.1.1`). That PR contains:
+
 - The version bump in `package.json`
 - An updated `CHANGELOG.md`
 
@@ -96,11 +102,11 @@ That's it. No manual version bumps, no manual tagging, no `npm publish` locally.
 
 Commit message prefixes determine the bump type:
 
-| Prefix | Bump | Example |
-|--------|------|---------|
-| `fix:` | patch (`0.1.0` → `0.1.1`) | `fix: handle empty VTT files` |
-| `feat:` | minor (`0.1.0` → `0.2.0`) | `feat: add JSON output format` |
-| `feat!:` or `BREAKING CHANGE:` in body | major (`0.1.0` → `1.0.0`) | `feat!: rename config field` |
+| Prefix                                 | Bump                      | Example                        |
+| -------------------------------------- | ------------------------- | ------------------------------ |
+| `fix:`                                 | patch (`0.1.0` → `0.1.1`) | `fix: handle empty VTT files`  |
+| `feat:`                                | minor (`0.1.0` → `0.2.0`) | `feat: add JSON output format` |
+| `feat!:` or `BREAKING CHANGE:` in body | major (`0.1.0` → `1.0.0`) | `feat!: rename config field`   |
 
 Other prefixes (`chore:`, `docs:`, `ci:`, etc.) appear in the changelog but don't trigger a release on their own.
 

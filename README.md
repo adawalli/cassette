@@ -90,8 +90,8 @@ output:
   # copy_filename: "{{date}} {{title}}"  # optional template for copied filenames
   # stem_strip: "_[a-f0-9]{4,8}$"       # regex to clean unwanted suffixes from {{stem}}
 
-# transcript.path is optional (defaults to "$[*]"), only used for JSON files.
-# VTT files are parsed natively and ignore this section.
+# The whole transcript block is optional and only used for JSON files.
+# VTT files are parsed natively and ignore it.
 transcript:
   path: "$[*]" # MacWhisper exports a root-level array
   speaker_field: speaker
@@ -103,10 +103,10 @@ prompt: |
 
 When `copy_to` is set, processed files are copied to that directory. The optional `copy_filename` field controls the copied filename using template variables:
 
-| Variable | Description |
-|----------|-------------|
-| `{{date}}` | Recording date in `YYYY-MM-DD` format |
-| `{{stem}}` | Filename without extension and leading date |
+| Variable    | Description                                                |
+| ----------- | ---------------------------------------------------------- |
+| `{{date}}`  | Recording date in `YYYY-MM-DD` format                      |
+| `{{stem}}`  | Filename without extension and leading date                |
 | `{{title}}` | YAML front matter `title` field (falls back to `{{stem}}`) |
 
 The `.md` extension is appended automatically. Do not include it in the template - `"{{date}} {{title}}"` produces `2026-03-20 Weekly Standup.md`. If the template already ends with `.md` it won't be doubled.
@@ -163,8 +163,33 @@ Each step accepts:
 - `prompt` (required) - the prompt sent to the LLM along with the current input
 - `suffix` (optional) - output filename suffix; defaults to `output.markdown_suffix`
 - `llm` (optional) - per-step LLM overrides (any field from the top-level `llm:` block)
+- `notify` (optional) - also fire the `on_complete` hook for this step's output
 
-You must use either `prompt:` or `steps:`, not both.
+You must use either `prompt:` or `steps:`, not both. Each step must produce a distinct output file, so no two steps may share a suffix (and a step using `.md` collides with the default suffix).
+
+### Intake
+
+Point cassette at a download folder and it will move matching files into `root_dir` (under a `YYYY/MM-DD` week folder) before processing them:
+
+```yaml
+intake:
+  source_dir: ~/Downloads
+  include_glob: "**/*.vtt"
+  exclude_glob: []
+  delete_source: true # false copies instead of moving
+```
+
+### on_complete hook
+
+Runs a shell command after each file finishes successfully:
+
+```yaml
+on_complete:
+  command: 'terminal-notifier -title "Cassette" -message "Transcribed {{input}}"'
+  timeout_ms: 10000
+```
+
+Variables: `{{input}}`, `{{output}}`, `{{root_dir}}`, plus `{{step_name}}` and `{{step_output}}` for per-step hooks fired by `notify: true`. A failing or timed-out hook is logged, never fatal.
 
 Full example with all options: [config.example.yaml](config.example.yaml)
 
@@ -222,6 +247,13 @@ cassette --help
 ## macOS LaunchAgent
 
 See [docs/launchagent.md](docs/launchagent.md).
+
+## Capturing transcripts from Microsoft Teams
+
+[`tampermonkey/teams-vtt-export.user.js`](tampermonkey/teams-vtt-export.user.js) is an optional
+userscript that adds a VTT download button to Teams meeting recordings. Install it in Tampermonkey
+and point `intake.source_dir` at your downloads folder. It is unsupported best-effort - Teams DOM
+changes will break it.
 
 ## Contributing
 
