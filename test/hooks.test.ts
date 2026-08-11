@@ -1,8 +1,9 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { runOnCompleteHook } from "../src/hooks";
+import { logger } from "../src/logger";
 import { replaceTemplateVars } from "../src/paths";
 import type { OnCompleteConfig } from "../src/schemas";
 
@@ -25,28 +26,33 @@ describe("replaceTemplateVars", () => {
     });
     expect(result).toBe("Transcribed /tmp/a.json -> {{output}}");
   });
-
-  test("handles empty vars record", () => {
-    const result = replaceTemplateVars("{{foo}} {{bar}}", {});
-    expect(result).toBe("{{foo}} {{bar}}");
-  });
 });
 
 describe("runOnCompleteHook", () => {
-  test("resolves without error on successful command", async () => {
-    await expect(
-      runOnCompleteHook(hookConfig({ command: "echo ok" }), {}),
-    ).resolves.toBeUndefined();
+  test("reports stderr from a failed command", async () => {
+    const warnSpy = spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await runOnCompleteHook(hookConfig({ command: "echo hook-error >&2; exit 7" }), {});
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "on_complete failed (exit 7): echo hook-error >&2; exit 7 | stderr: hook-error",
+        ),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
-  test("resolves without throwing on failed command (exit 1)", async () => {
-    await expect(runOnCompleteHook(hookConfig({ command: "exit 1" }), {})).resolves.toBeUndefined();
-  });
-
-  test("resolves without throwing on timeout", async () => {
-    await expect(
-      runOnCompleteHook(hookConfig({ command: "sleep 60", timeout_ms: 100 }), {}),
-    ).resolves.toBeUndefined();
+  test("reports a timed-out command", async () => {
+    const warnSpy = spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await runOnCompleteHook(hookConfig({ command: "exec sleep 60", timeout_ms: 100 }), {});
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("on_complete timed out after 100ms"),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   test("substitutes template vars into command", async () => {

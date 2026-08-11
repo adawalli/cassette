@@ -1,4 +1,4 @@
-import { describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { processTranscriptFile, applyStemStrip } from "../src/processor";
@@ -6,6 +6,18 @@ import type { LlmClient } from "../src/llm";
 import { logger } from "../src/logger";
 import { OutputConfigSchema, type ResolvedTranscriberConfig } from "../src/schemas";
 import { baseConfig, copyConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
+
+const realStableWait = {
+  waitForStableFile: (await import("../src/stable-wait")).waitForStableFile,
+};
+
+beforeEach(() => {
+  mock.module("../src/stable-wait", () => ({ waitForStableFile: async () => {} }));
+});
+
+afterEach(() => {
+  mock.module("../src/stable-wait", () => realStableWait);
+});
 
 installTempDirCleanup();
 
@@ -281,6 +293,48 @@ describe("processTranscriptFile", () => {
     expect(await fileExists(jsonPath)).toBe(false);
     expect(await fileExists(path.join(dir, "_failed", "meeting.json"))).toBe(true);
     expect(await fileExists(path.join(dir, "_failed", "meeting.error.log"))).toBe(true);
+  });
+
+  test("overwrites existing markdown when overwrite is enabled", async () => {
+    const dir = await makeTempDir();
+    const jsonPath = path.join(dir, "meeting.json");
+    const mdPath = path.join(dir, "meeting.md");
+    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+    await writeFile(mdPath, "stale", "utf8");
+
+    let calls = 0;
+    const llmClient: LlmClient = {
+      generate: async () => {
+        calls += 1;
+        return "fresh";
+      },
+    };
+    const base = baseConfig(dir);
+    const config = { ...base, output: { ...base.output, overwrite: true } };
+
+    const result = await processTranscriptFile(jsonPath, config, { llmClient });
+
+    expect(result.status).toBe("success");
+    expect(calls).toBe(1);
+    expect(await readFile(mdPath, "utf8")).toBe("fresh");
+  });
+
+  test("quarantines without an error log when configured", async () => {
+    const dir = await makeTempDir();
+    const jsonPath = path.join(dir, "meeting.json");
+    await writeFile(jsonPath, "not json", "utf8");
+
+    const base = baseConfig(dir);
+    const config = { ...base, failure: { ...base.failure, write_error_log: false } };
+    const result = await processTranscriptFile(jsonPath, config, {
+      llmClient: { generate: async () => "should not run" },
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      quarantinedPath: path.join(dir, "_failed", "meeting.json"),
+    });
+    expect(await fileExists(path.join(dir, "_failed", "meeting.error.log"))).toBe(false);
   });
 
   test("does not quarantine when move_failed is false", async () => {

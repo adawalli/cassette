@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import { runBackfill, runService, scanInputFiles } from "../src/service";
@@ -6,6 +6,18 @@ import type { LlmClient } from "../src/llm";
 import type { IntakeConfig, OnCompleteConfig, ResolvedTranscriberConfig } from "../src/schemas";
 import { sleep } from "../src/sleep";
 import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
+
+const realStableWait = {
+  waitForStableFile: (await import("../src/stable-wait")).waitForStableFile,
+};
+
+beforeEach(() => {
+  mock.module("../src/stable-wait", () => ({ waitForStableFile: async () => {} }));
+});
+
+afterEach(() => {
+  mock.module("../src/stable-wait", () => realStableWait);
+});
 
 installTempDirCleanup();
 
