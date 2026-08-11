@@ -54,8 +54,10 @@ describe("createFileFilter", () => {
   });
 
   test("rejects files in failed directory", () => {
-    const filter = createFileFilter(makeConfig(root));
-    expect(filter(path.join(root, "_failed", "bad.json"))).toBe(false);
+    const config = makeConfig(root, { exclude_glob: [] });
+    config.failure.failed_dir_name = "_quarantine";
+    const filter = createFileFilter(config);
+    expect(filter(path.join(root, "_quarantine", "bad.json"))).toBe(false);
   });
 
   test("applies exclude globs", () => {
