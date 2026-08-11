@@ -1,4 +1,4 @@
-import { describe, expect, mock, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ConfigWithIntake } from "../src/schemas";
@@ -11,27 +11,34 @@ let capturedListener: WatchListener;
 let capturedOnError: (err: unknown) => void;
 const fakeClose = mock(() => {});
 
-// Mock node:fs to capture the watch listener (same pattern as watcher.test.ts)
-mock.module("node:fs", () => ({
-  watch: (_dir: string, _opts: unknown, listener: WatchListener) => {
-    capturedListener = listener;
-    return {
-      close: fakeClose,
-      on: (event: string, handler: (err: unknown) => void) => {
-        if (event === "error") capturedOnError = handler;
-      },
-    };
-  },
-}));
+const realNodeFs = { watch: (await import("node:fs")).watch };
+const realStableWait = {
+  waitForStableFile: (await import("../src/stable-wait")).waitForStableFile,
+};
 
-mock.module("../src/stable-wait", () => ({
-  waitForStableFile: async () => {},
-  sleep: async () => {},
-}));
-
-// Dynamic import after mocks are set up
 const { startIntakeWatcher } = await import("../src/intake");
 const { logger } = await import("../src/logger");
+
+beforeEach(() => {
+  fakeClose.mockClear();
+  mock.module("node:fs", () => ({
+    watch: (_dir: string, _opts: unknown, listener: WatchListener) => {
+      capturedListener = listener;
+      return {
+        close: fakeClose,
+        on: (event: string, handler: (err: unknown) => void) => {
+          if (event === "error") capturedOnError = handler;
+        },
+      };
+    },
+  }));
+  mock.module("../src/stable-wait", () => ({ waitForStableFile: async () => {} }));
+});
+
+afterEach(() => {
+  mock.module("node:fs", () => realNodeFs);
+  mock.module("../src/stable-wait", () => realStableWait);
+});
 
 installTempDirCleanup();
 
@@ -45,7 +52,7 @@ function intakeWatcherConfig(rootDir: string, sourceDir: string): ConfigWithInta
         delete_source: true,
       },
     }),
-    watch: { ...baseConfig(rootDir).watch, stable_window_ms: 0, include_glob: "**/*.{json,vtt}" },
+    watch: { ...baseConfig(rootDir).watch, stable_window_ms: 1, include_glob: "**/*.{json,vtt}" },
     transcript: { path: "$[*]", text_field: "text", speaker_field: "speaker" },
     steps: [{ name: "default", prompt: "prompt", notify: false }],
   };

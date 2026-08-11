@@ -1,6 +1,10 @@
 import { describe, expect, mock, test } from "bun:test";
+import path from "node:path";
 import { helpText, parseArgs } from "../src/index";
 import pkg from "../package.json";
+import { installTempDirCleanup, makeTempDir } from "./helpers";
+
+installTempDirCleanup();
 
 describe("parseArgs", () => {
   test("parses help flag without requiring config", () => {
@@ -59,19 +63,20 @@ describe("main --version", () => {
 });
 
 describe("startup version log", () => {
-  test("logs version at startup for run command", async () => {
+  test("logs version before reporting a configured missing config file", async () => {
+    const configPath = path.join(await makeTempDir(), "missing.yaml");
     const { logger } = await import("../src/logger");
     const infoSpy = mock();
     const origInfo = logger.info;
     logger.info = infoSpy;
     try {
       const { main } = await import("../src/index");
-      // This will fail because no config exists, but version should be logged before config loading
-      await main([]).catch(() => {});
+      await expect(main(["--config", configPath])).rejects.toThrow(
+        `Config not found at ${configPath}`,
+      );
     } finally {
       logger.info = origInfo;
     }
-    const calls = infoSpy.mock.calls.map((c: unknown[]) => String(c[0]));
-    expect(calls.some((msg) => msg.includes(pkg.version))).toBe(true);
+    expect(infoSpy).toHaveBeenCalledWith(`cassette v${pkg.version}`);
   });
 });

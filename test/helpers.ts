@@ -68,7 +68,7 @@ export function baseConfig(
   return {
     watch: {
       root_dir: rootDir,
-      stable_window_ms: 0,
+      stable_window_ms: 1,
       include_glob: "**/*.json",
       exclude_glob: ["**/_failed/**"],
     },
