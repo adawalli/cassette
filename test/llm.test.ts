@@ -131,6 +131,15 @@ describe("generate - LLM configuration", () => {
     expect(createArgs[0]!.max_tokens).toBe(1500);
   });
 
+  test("omits temperature when configured as null", async () => {
+    const client = createOpenAILlmClient({ OPENAI_API_KEY: "sk-test" });
+    await client.generate("system prompt", "user transcript", baseLlmConfig({ temperature: null }));
+
+    expect(createArgs).toHaveLength(1);
+    expect(createArgs[0]!).not.toHaveProperty("temperature");
+    expect(createArgs[0]!.max_tokens).toBe(2000);
+  });
+
   test("sends system prompt and user message with correct roles", async () => {
     const client = createOpenAILlmClient({ OPENAI_API_KEY: "sk-test" });
 

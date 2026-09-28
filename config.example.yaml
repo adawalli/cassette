@@ -38,6 +38,7 @@ failure:
 llm:
   base_url: "https://api.openai.com/v1/"
   model: "gpt-4o"
+  # Set to null for models that reject the temperature request parameter.
   temperature: 0.1
   max_tokens: 12000
   timeout_ms: 120000

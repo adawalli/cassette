@@ -52,7 +52,7 @@ export const FailureConfigSchema = z.object({
 export const LlmConfigSchema = z.object({
   base_url: z.string().url().default("https://api.openai.com/v1/"),
   model: z.string().min(1).default("gpt-4o"),
-  temperature: z.number().min(0).max(2).default(0.1),
+  temperature: z.number().min(0).max(2).nullable().default(0.1),
   max_tokens: z.number().int().positive().default(12000),
   timeout_ms: z.number().int().positive().default(120000),
   retries: z.number().int().min(0).default(5),
@@ -127,7 +127,8 @@ export type StepResult = {
 
 export type ProcessingResult =
   | { status: "success"; markdownPath: string; warnings: string[]; stepResults?: StepResult[] }
-  | { status: "skipped"; reason: "markdown_exists" }
+  | { status: "skipped"; reason: "markdown_exists" | "source_missing" }
+  | { status: "blocked"; errorMessage: string; failedStep: string }
   | {
       status: "failed";
       errorMessage: string;

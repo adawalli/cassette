@@ -264,6 +264,38 @@ describe("normalizeSteps", () => {
     expect(resolved.steps[0]!.llm?.model).toBe("gpt-4o");
     expect(resolved.steps[0]!.llm?.temperature).toBe(0.5);
   });
+
+  test("null temperature can omit the request parameter globally or per step", () => {
+    const config = TranscriberConfigSchema.parse({
+      watch: { root_dir: "/tmp/meetings" },
+      llm: { temperature: 0.5 },
+      steps: [
+        { name: "clean", prompt: "clean it" },
+        {
+          name: "summarize",
+          prompt: "summarize it",
+          suffix: ".summary.md",
+          llm: { temperature: null },
+        },
+      ],
+    });
+    const resolved = normalizeSteps(config);
+    expect(resolved.llm.temperature).toBe(0.5);
+    expect(resolved.steps[1]!.llm?.temperature).toBeNull();
+    expect(
+      TranscriberConfigSchema.parse({
+        watch: { root_dir: "/tmp/meetings" },
+        prompt: "clean it",
+        llm: { temperature: null },
+      }).llm.temperature,
+    ).toBeNull();
+    expect(
+      TranscriberConfigSchema.parse({
+        watch: { root_dir: "/tmp/meetings" },
+        prompt: "clean it",
+      }).llm.temperature,
+    ).toBe(0.1);
+  });
 });
 
 describe("schema validation - prompt/steps mutual exclusion", () => {

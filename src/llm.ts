@@ -52,7 +52,7 @@ export function createOpenAILlmClient(env: NodeJS.ProcessEnv = process.env): Llm
       const runRequest = async (): Promise<string> => {
         const response = await client.chat.completions.create({
           model: llmConfig.model,
-          temperature: llmConfig.temperature,
+          ...(llmConfig.temperature === null ? {} : { temperature: llmConfig.temperature }),
           max_tokens: llmConfig.max_tokens,
           messages: [
             { role: "system", content: prompt },
