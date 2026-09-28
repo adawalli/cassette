@@ -8,6 +8,7 @@ import {
   errorMessage,
   exists,
   expandTilde,
+  isEnoent,
   isVttPath,
   markdownPathFor,
   replaceTemplateVars,
@@ -187,27 +188,42 @@ export async function processTranscriptFile(
     markdownPathFor(filePath, step.suffix ?? config.output.markdown_suffix),
   );
 
-  if (!config.output.overwrite) {
-    const existChecks = await Promise.all(outputPaths.map((p) => exists(p)));
-    if (existChecks.every(Boolean)) {
-      logger.debug(`skipping - all outputs exist: ${outputPaths.join(", ")}`);
-      return { status: "skipped", reason: "markdown_exists" };
-    }
-  }
-
   let currentStepIndex = -1;
   try {
+    if (!(await exists(filePath))) {
+      logger.debug(`skipping - source no longer exists: ${filePath}`);
+      return { status: "skipped", reason: "source_missing" };
+    }
+
+    if (!config.output.overwrite) {
+      const existChecks = await Promise.all(outputPaths.map((p) => exists(p)));
+      if (existChecks.every(Boolean)) {
+        logger.debug(`skipping - all outputs exist: ${outputPaths.join(", ")}`);
+        return { status: "skipped", reason: "markdown_exists" };
+      }
+    }
+
     logger.info(
       `waiting for stable file ${filePath} (stable_window_ms=${config.watch.stable_window_ms})`,
     );
-    await waitForStableFile(filePath, config.watch.stable_window_ms);
-    logger.debug(`file stabilized: ${filePath}`);
-    const filenameDate = recordingDateFromFilename(filePath);
-    const recordingDate = filenameDate ?? recordingDateFromBirthtime(await stat(filePath));
-    logger.debug(
-      `recording date: ${recordingDate} (source: ${filenameDate ? "filename" : "birthtime"})`,
-    );
-    const raw = await readFile(filePath, "utf8");
+    let recordingDate: string;
+    let raw: string;
+    try {
+      await waitForStableFile(filePath, config.watch.stable_window_ms);
+      logger.debug(`file stabilized: ${filePath}`);
+      const filenameDate = recordingDateFromFilename(filePath);
+      recordingDate = filenameDate ?? recordingDateFromBirthtime(await stat(filePath));
+      logger.debug(
+        `recording date: ${recordingDate} (source: ${filenameDate ? "filename" : "birthtime"})`,
+      );
+      raw = await readFile(filePath, "utf8");
+    } catch (error) {
+      if (isEnoent(error)) {
+        logger.debug(`skipping - source disappeared while reading: ${filePath}`);
+        return { status: "skipped", reason: "source_missing" };
+      }
+      throw error;
+    }
     logger.debug(`read input bytes: ${raw.length}`);
     const units = isVttPath(filePath)
       ? extractVttTranscriptUnits(raw)
@@ -234,9 +250,13 @@ export async function processTranscriptFile(
         logger.info(
           `step "${step.name}" calling llm model=${mergedLlm.model} base_url=${mergedLlm.base_url}`,
         );
-        stepOutput = stripOuterCodeFence(
-          (await deps.llmClient.generate(step.prompt, currentInput, mergedLlm)).trimStart(),
-        );
+        let generated: string;
+        try {
+          generated = await deps.llmClient.generate(step.prompt, currentInput, mergedLlm);
+        } catch (error) {
+          return { status: "blocked", errorMessage: errorMessage(error), failedStep: step.name };
+        }
+        stepOutput = stripOuterCodeFence(generated.trimStart());
         logger.debug(`step "${step.name}" received output chars: ${stepOutput.length}`);
         await writeFile(outPath, stepOutput, "utf8");
         logger.debug(`step "${step.name}" wrote output: ${outPath}`);

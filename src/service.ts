@@ -34,7 +34,15 @@ function logProcessingResult(filePath: string, result: ProcessingResult): void {
   }
 
   if (result.status === "skipped") {
-    logger.info(`[processor] skipped (${result.reason}): ${filePath}`);
+    const log = result.reason === "source_missing" ? logger.debug : logger.info;
+    log(`[processor] skipped (${result.reason}): ${filePath}`);
+    return;
+  }
+
+  if (result.status === "blocked") {
+    logger.error(
+      `[processor] LLM failed at step "${result.failedStep}": ${filePath} (error=${result.errorMessage}; source preserved)`,
+    );
     return;
   }
 
@@ -95,14 +103,15 @@ export function scanInputFiles(config: ResolvedTranscriberConfig): Promise<strin
 function makeProcessAndLog(
   config: ResolvedTranscriberConfig,
   deps: ServiceDeps,
-): (filePath: string) => Promise<void> {
+): (filePath: string) => Promise<ProcessingResult> {
   return async (filePath: string) => {
-    logger.info(`[processor] processing: ${filePath}`);
+    logger.debug(`[processor] processing: ${filePath}`);
     const result = await processTranscriptFile(filePath, config, {
       llmClient: deps.llmClient,
     });
     logProcessingResult(filePath, result);
     await fireOnCompleteHooks(filePath, result, config);
+    return result;
   };
 }
 
@@ -112,6 +121,7 @@ export async function runBackfill(
 ): Promise<void> {
   const queue = new SerialQueue();
   const processAndLog = makeProcessAndLog(config, deps);
+  const pauseState: { blocked?: { filePath: string; errorMessage: string } } = {};
 
   // Intaken files land inside root_dir, so the scan below finds them again - dedupe.
   const files = new Set(config.intake ? await executeIntake(config as ConfigWithIntake) : []);
@@ -120,9 +130,20 @@ export async function runBackfill(
   }
 
   for (const filePath of files) {
-    queue.enqueue(() => processAndLog(filePath));
+    queue.enqueue(async () => {
+      if (pauseState.blocked) return;
+      const result = await processAndLog(filePath);
+      if (result.status === "blocked") {
+        pauseState.blocked = { filePath, errorMessage: result.errorMessage };
+      }
+    });
   }
   await queue.onIdle();
+  if (pauseState.blocked) {
+    throw new Error(
+      `Backfill stopped after LLM failure for ${pauseState.blocked.filePath}: ${pauseState.blocked.errorMessage}`,
+    );
+  }
 }
 
 export async function runService(
@@ -132,15 +153,25 @@ export async function runService(
   const queue = new SerialQueue();
   const pending = new Set<string>();
   const processAndLog = makeProcessAndLog(config, deps);
+  let paused = false;
+  let intakeWatcher: AsyncHandle | null = null;
 
   const enqueuePath = (filePath: string): void => {
-    if (pending.has(filePath)) {
+    if (paused || pending.has(filePath)) {
       return;
     }
     pending.add(filePath);
     queue.enqueue(async () => {
       try {
-        await processAndLog(filePath);
+        if (paused) return;
+        const result = await processAndLog(filePath);
+        if (result.status === "blocked") {
+          paused = true;
+          intakeWatcher?.stop();
+          logger.error(
+            `[service] processing paused after LLM failure; intake stopped, source files preserved. Restart Cassette after fixing the LLM configuration or upstream service.`,
+          );
+        }
       } finally {
         pending.delete(filePath);
       }
@@ -160,7 +191,7 @@ export async function runService(
   }
 
   const mainWatcher = startRecursiveWatcher({ config, onFilePath: enqueuePath });
-  const intakeWatcher = configWithIntake
+  intakeWatcher = configWithIntake
     ? startIntakeWatcher({ config: configWithIntake, onIntake: enqueuePath })
     : null;
 

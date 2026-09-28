@@ -94,23 +94,16 @@ describe("processTranscriptFile", () => {
     }
   });
 
-  test("returns failed silently when source file is already missing during quarantine", async () => {
+  test("quietly skips a source that has disappeared", async () => {
     const dir = await makeTempDir();
     const jsonPath = path.join(dir, "missing.json");
-    // File never created - waitForStableFile throws ENOENT, triggering quarantineFailure
-    // on a source that no longer exists. The guard should prevent a rename ENOENT crash.
     const llmClient: LlmClient = {
       generate: async () => "should not run",
     };
 
     const result = await processTranscriptFile(jsonPath, baseConfig(dir), { llmClient });
-    expect(result.status).toBe("failed");
-    // No quarantinedPath or errorLogPath since source didn't exist
-    if (result.status === "failed") {
-      expect(result.errorMessage).toContain("ENOENT");
-      expect(result.quarantinedPath).toBeUndefined();
-      expect(result.errorLogPath).toBeUndefined();
-    }
+    expect(result).toEqual({ status: "skipped", reason: "source_missing" });
+    expect(await fileExists(path.join(dir, "_failed"))).toBe(false);
   });
 
   test("copies output to copy_to dir with date-prefixed filename", async () => {
@@ -255,7 +248,7 @@ describe("processTranscriptFile", () => {
     expect(await fileExists(expectedFile)).toBe(true);
   });
 
-  test("quarantines file and writes error log on failure", async () => {
+  test("preserves the source on LLM failure", async () => {
     const dir = await makeTempDir();
     const jsonPath = path.join(dir, "meeting.json");
     await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
@@ -267,21 +260,33 @@ describe("processTranscriptFile", () => {
     };
 
     const result = await processTranscriptFile(jsonPath, baseConfig(dir), { llmClient });
-    expect(result.status).toBe("failed");
-    if (result.status === "failed") {
+    expect(result.status).toBe("blocked");
+    if (result.status === "blocked") {
       expect(result.errorMessage).toBe("upstream error");
+      expect(result.failedStep).toBe("default");
     }
 
-    const failedJsonPath = path.join(dir, "_failed", "meeting.json");
-    const errorLogPath = path.join(dir, "_failed", "meeting.error.log");
-    expect(await fileExists(failedJsonPath)).toBe(true);
-    expect(await fileExists(errorLogPath)).toBe(true);
+    expect(await fileExists(jsonPath)).toBe(true);
+    expect(await fileExists(path.join(dir, "_failed"))).toBe(false);
+  });
+
+  test("quarantines malformed input and writes its error log", async () => {
+    const dir = await makeTempDir();
+    const jsonPath = path.join(dir, "meeting.json");
+    await writeFile(jsonPath, "not json", "utf8");
+
+    const llmClient: LlmClient = { generate: async () => "should not run" };
+    const result = await processTranscriptFile(jsonPath, baseConfig(dir), { llmClient });
+    expect(result.status).toBe("failed");
+    expect(await fileExists(jsonPath)).toBe(false);
+    expect(await fileExists(path.join(dir, "_failed", "meeting.json"))).toBe(true);
+    expect(await fileExists(path.join(dir, "_failed", "meeting.error.log"))).toBe(true);
   });
 
   test("does not quarantine when move_failed is false", async () => {
     const dir = await makeTempDir();
     const jsonPath = path.join(dir, "meeting.json");
-    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+    await writeFile(jsonPath, "not json", "utf8");
 
     const llmClient: LlmClient = {
       generate: async () => {
@@ -303,7 +308,7 @@ describe("processTranscriptFile", () => {
   test("uses timestamped path when quarantine target already exists", async () => {
     const dir = await makeTempDir();
     const jsonPath = path.join(dir, "meeting.json");
-    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+    await writeFile(jsonPath, "not json", "utf8");
 
     // Pre-create the expected quarantine target to force timestamp collision path
     await mkdir(path.join(dir, "_failed"), { recursive: true });
@@ -325,7 +330,7 @@ describe("processTranscriptFile", () => {
   test("returns failed gracefully when quarantine itself throws", async () => {
     const dir = await makeTempDir();
     const jsonPath = path.join(dir, "meeting.json");
-    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+    await writeFile(jsonPath, "not json", "utf8");
 
     // Pre-create _failed as a file so mkdir throws ENOTDIR
     await writeFile(path.join(dir, "_failed"), "blocker", "utf8");
@@ -341,7 +346,7 @@ describe("processTranscriptFile", () => {
       const result = await processTranscriptFile(jsonPath, baseConfig(dir), { llmClient });
       expect(result.status).toBe("failed");
       if (result.status === "failed") {
-        expect(result.errorMessage).toBe("upstream error");
+        expect(result.errorMessage).toContain("JSON");
         expect(result.quarantinedPath).toBeUndefined();
         expect(result.errorLogPath).toBeUndefined();
       }
@@ -466,14 +471,16 @@ describe("processTranscriptFile - multi-step chaining", () => {
     };
 
     const result = await processTranscriptFile(jsonPath, twoStepConfig(dir), { llmClient });
-    expect(result.status).toBe("failed");
-    if (result.status === "failed") {
+    expect(result.status).toBe("blocked");
+    if (result.status === "blocked") {
       expect(result.failedStep).toBe("summarize");
       expect(result.errorMessage).toBe("step 2 exploded");
     }
 
     // step 1 output should still be on disk
     expect(await fileExists(path.join(dir, "meeting.cleaned.md"))).toBe(true);
+    expect(await fileExists(jsonPath)).toBe(true);
+    expect(await fileExists(path.join(dir, "_failed"))).toBe(false);
   });
 
   test("processes a .vtt file using VTT parser", async () => {
@@ -540,6 +547,27 @@ describe("processTranscriptFile - multi-step chaining", () => {
     expect(capturedConfigs[0]!.temperature).toBe(0.9);
     // other fields come from global config
     expect(capturedConfigs[0]!.retries).toBe(1);
+  });
+
+  test("per-step null temperature overrides a numeric global value", async () => {
+    const dir = await makeTempDir();
+    const jsonPath = path.join(dir, "meeting.json");
+    await writeFile(jsonPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
+
+    let temperature: number | null | undefined;
+    const llmClient: LlmClient = {
+      generate: async (_prompt, _input, llmConfig) => {
+        temperature = llmConfig.temperature;
+        return "output";
+      },
+    };
+    const config: ResolvedTranscriberConfig = {
+      ...baseConfig(dir),
+      steps: [{ name: "clean", prompt: "clean it", llm: { temperature: null } }],
+    };
+
+    await processTranscriptFile(jsonPath, config, { llmClient });
+    expect(temperature).toBeNull();
   });
 });
 

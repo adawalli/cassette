@@ -48,9 +48,11 @@ sequenceDiagram
         Note over Proc: step output becomes next step's input
     end
 
-    alt on failure
+    alt on file-specific failure
         Proc->>FS: move source to _failed/
         Proc->>FS: write .error.log
+    else on LLM failure
+        Proc-->>Svc: preserve source and pause processing until restart
     end
 ```
 
@@ -100,6 +102,8 @@ transcript:
 prompt: |
   You are a meeting transcript editor. Clean up this raw transcript...
 ```
+
+For a model that rejects the `temperature` request parameter, set `llm.temperature: null` (or `steps[].llm.temperature: null` for one step). Otherwise, temperature defaults to `0.1`. An LLM failure leaves the source and completed step outputs in place; watch mode pauses processing until restart, while `--once` exits with an error. Malformed transcript files still follow the `failure:` quarantine settings.
 
 When `copy_to` is set, processed files are copied to that directory. The optional `copy_filename` field controls the copied filename using template variables:
 
