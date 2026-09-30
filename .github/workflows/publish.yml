@@ -27,6 +27,7 @@ jobs:
       pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
+      release_sha: ${{ steps.release.outputs.sha }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -42,6 +43,8 @@ jobs:
       id-token: write # Required for OIDC trusted publishing
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.release_sha }}
 
       - uses: actions/setup-node@v4
         with:
