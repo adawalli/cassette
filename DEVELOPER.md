@@ -86,7 +86,7 @@ The package is published as `@cassette-meetings/cli` under the `cassette-meeting
 
 The `release-please` job analyzes commits since the last release and maintains an open "Release PR" (titled e.g. `chore(main): release 0.1.1`) containing the version bump in `package.json` and an updated `CHANGELOG.md`.
 
-The `publish` job runs only when the first job reports `release_created` - that is, on the push that merges the Release PR. It typechecks, tests, builds, and publishes to npm using OIDC (no tokens required).
+The `publish` job runs only when the first job reports `release_created`. It checks out the released SHA, then typechecks, tests, builds, and publishes to npm using OIDC (no tokens required).
 
 Both live in one workflow because a GitHub Release created with the built-in `GITHUB_TOKEN` does not trigger other workflows, so a separate `on: release` publish job would never fire. The alternative is a personal access token, which expires silently and blocks every release until someone notices.
 
@@ -99,7 +99,7 @@ The filename `publish.yml` is load-bearing: npm's trusted publisher config pins 
 3. When you're ready to ship, review and merge the Release PR
 4. Merging it pushes to `main`, which runs the workflow again - this time release-please cuts the GitHub Release and the publish job fires
 
-Note that the Release PR itself gets no CI checks. A PR opened by `GITHUB_TOKEN` cannot trigger workflows, and that PR only edits `package.json` and `CHANGELOG.md`. The publish job typechecks, tests, and builds before it publishes, so nothing ships untested.
+CI runs for a Release PR opened or updated by `GITHUB_TOKEN` require approval through the PR's **Approve workflows to run** banner. The publish job also typechecks, tests, and builds the released SHA before it publishes.
 
 That's it. No manual version bumps, no manual tagging, no `npm publish` locally.
 
