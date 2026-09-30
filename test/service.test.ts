@@ -1,10 +1,34 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { writeFile, readFile } from "node:fs/promises";
 import path from "node:path";
 import { runBackfill, runService, scanInputFiles } from "../src/service";
 import type { LlmClient } from "../src/llm";
 import type { IntakeConfig, OnCompleteConfig, ResolvedTranscriberConfig } from "../src/schemas";
 import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
+
+let onWatchedFile: ((filePath: string) => void) | undefined;
+const realWatcher = {
+  startRecursiveWatcher: (await import("../src/watcher")).startRecursiveWatcher,
+};
+const realStableWait = {
+  waitForStableFile: (await import("../src/stable-wait")).waitForStableFile,
+};
+
+beforeEach(() => {
+  onWatchedFile = undefined;
+  mock.module("../src/watcher", () => ({
+    startRecursiveWatcher: ({ onFilePath }: { onFilePath: (filePath: string) => void }) => {
+      onWatchedFile = onFilePath;
+      return { stop: () => {}, onIdle: async () => {} };
+    },
+  }));
+  mock.module("../src/stable-wait", () => ({ waitForStableFile: async () => {} }));
+});
+
+afterEach(() => {
+  mock.module("../src/watcher", () => realWatcher);
+  mock.module("../src/stable-wait", () => realStableWait);
+});
 
 installTempDirCleanup();
 
@@ -149,7 +173,7 @@ describe("on_complete hook", () => {
     expect(await fileExists(logFile)).toBe(false);
   });
 
-  test("per-step notify fires hook for flagged step and final hook", async () => {
+  test("per-step notify distinguishes a flagged non-final step from the final hook", async () => {
     const dir = await makeTempDir();
     const logFile = path.join(dir, "hook.log");
     await writeFile(
@@ -161,12 +185,11 @@ describe("on_complete hook", () => {
     const cfg: ResolvedTranscriberConfig = {
       ...config(dir),
       steps: [
-        { name: "clean", prompt: "clean it", suffix: ".cleaned.md", notify: false },
-        { name: "summarize", prompt: "summarize it", suffix: ".summary.md", notify: true },
+        { name: "clean", prompt: "clean it", suffix: ".cleaned.md", notify: true },
+        { name: "summarize", prompt: "summarize it", suffix: ".summary.md", notify: false },
       ],
       on_complete: {
-        // write {{output}} to the log so we can verify substitution
-        command: `echo "{{output}}" >> ${logFile}`,
+        command: `echo "{{step_name}}|{{output}}" >> ${logFile}`,
         timeout_ms: 5000,
       },
     };
@@ -176,20 +199,15 @@ describe("on_complete hook", () => {
 
     const content = await readFile(logFile, "utf8");
     const lines = content.trim().split("\n").filter(Boolean);
-    // clean step: notify false - no hook
-    // summarize step: notify true - 1 hook (output = .summary.md)
-    // final completion hook - 1 hook (output = .summary.md)
-    expect(lines).toHaveLength(2);
-    // {{output}} must be substituted in both calls - neither line should contain the literal template
-    for (const line of lines) {
-      expect(line).not.toContain("{{output}}");
-      expect(line).toMatch(/\.summary\.md$/);
-    }
+    expect(lines).toEqual([
+      `clean|${path.join(dir, "a.cleaned.md")}`,
+      `{{step_name}}|${path.join(dir, "a.summary.md")}`,
+    ]);
   });
 });
 
 describe("runService", () => {
-  test("processes existing files and returns a cleanup function", async () => {
+  test("processes existing files on startup", async () => {
     const dir = await makeTempDir();
     const aPath = path.join(dir, "a.json");
     await writeFile(aPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
@@ -203,7 +221,6 @@ describe("runService", () => {
     };
 
     const cfg = config(dir);
-    cfg.watch.stable_window_ms = 0;
     const { stop, onIdle } = await runService(cfg, { llmClient });
     await onIdle();
     stop();
@@ -218,24 +235,45 @@ describe("runService", () => {
     await writeFile(aPath, JSON.stringify({ segments: [{ text: "hello" }] }), "utf8");
 
     let callCount = 0;
+    let releaseFirst!: () => void;
+    let markFirstStarted!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const firstStarted = new Promise<void>((resolve) => {
+      markFirstStarted = resolve;
+    });
     const llmClient: LlmClient = {
       generate: async () => {
         callCount++;
+        if (callCount === 1) {
+          markFirstStarted();
+          await firstGate;
+        }
         return "# cleaned";
       },
     };
 
     const cfg = config(dir);
-    cfg.watch.stable_window_ms = 0;
+    cfg.output.overwrite = true;
     const { stop, onIdle } = await runService(cfg, { llmClient });
+
+    await firstStarted;
+    expect(onWatchedFile).toBeDefined();
+    onWatchedFile!(aPath);
+    onWatchedFile!(aPath);
+    releaseFirst();
+    await onIdle();
+    expect(callCount).toBe(1);
+
+    onWatchedFile!(aPath);
     await onIdle();
     stop();
 
-    // File should only be processed once despite being found by scanInputFiles
-    expect(callCount).toBe(1);
+    expect(callCount).toBe(2);
   });
 
-  test("with intake config scans intake source and starts both watchers", async () => {
+  test("processes an intaken startup file", async () => {
     const sourceDir = await makeTempDir();
     const rootDir = await makeTempDir();
 
@@ -251,7 +289,7 @@ describe("runService", () => {
       }),
       watch: {
         root_dir: rootDir,
-        stable_window_ms: 0,
+        stable_window_ms: 1,
         include_glob: "**/*.{json,vtt}",
         exclude_glob: ["**/_failed/**"],
       },
@@ -267,18 +305,6 @@ describe("runService", () => {
 
     // Source file should have been intaked (moved)
     expect(await fileExists(path.join(sourceDir, "call.vtt"))).toBe(false);
-  });
-
-  test("without intake returns only the main watcher cleanup", async () => {
-    const dir = await makeTempDir();
-
-    const llmClient: LlmClient = { generate: async () => "# out" };
-    const handle = await runService(config(dir), { llmClient });
-
-    // handle should have stop and onIdle
-    expect(typeof handle.stop).toBe("function");
-    expect(typeof handle.onIdle).toBe("function");
-    handle.stop();
   });
 });
 

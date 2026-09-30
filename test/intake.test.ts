@@ -1,11 +1,27 @@
-import { describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import * as fs from "node:fs/promises";
 import path from "node:path";
-import { intakeFile, executeIntake, startIntakeWatcher, weekSubpath } from "../src/intake";
+import { executeIntake, intakeFile, weekSubpath } from "../src/intake";
 import { logger } from "../src/logger";
 import { IntakeConfigSchema, TranscriberConfigSchema } from "../src/schemas";
 import type { ConfigWithIntake } from "../src/schemas";
 import { baseConfig, fileExists, installTempDirCleanup, makeTempDir } from "./helpers";
+
+const waitForStableFile = mock(async (_filePath: string, _stableWindowMs: number) => {});
+const realStableWait = {
+  waitForStableFile: (await import("../src/stable-wait")).waitForStableFile,
+};
+
+beforeEach(() => {
+  waitForStableFile.mockReset();
+  waitForStableFile.mockImplementation(async () => {});
+  mock.module("../src/stable-wait", () => ({ waitForStableFile }));
+});
+
+afterEach(() => {
+  mock.module("../src/stable-wait", () => realStableWait);
+});
 
 installTempDirCleanup();
 
@@ -104,6 +120,43 @@ describe("intakeFile", () => {
     expect(await readFile(dest, "utf8")).toBe("WEBVTT\n\nnew content");
     expect(await readFile(path.join(weekPath, "meeting.vtt"), "utf8")).toBe("existing");
   });
+
+  test("copies then removes the source when rename crosses filesystems", async () => {
+    const sourceDir = await makeTempDir();
+    const rootDir = await makeTempDir();
+    const srcFile = path.join(sourceDir, "meeting.vtt");
+    await writeFile(srcFile, "WEBVTT\n\ncopy fallback", "utf8");
+
+    const exdev = Object.assign(new Error("cross-device link"), { code: "EXDEV" });
+    const renameSpy = spyOn(fs, "rename").mockRejectedValueOnce(exdev);
+    try {
+      const dest = await intakeFile(srcFile, intakeConfig(rootDir, sourceDir));
+      expect(await readFile(dest, "utf8")).toBe("WEBVTT\n\ncopy fallback");
+      expect(await fileExists(srcFile)).toBe(false);
+    } finally {
+      renameSpy.mockRestore();
+    }
+  });
+
+  test("keeps the source when the cross-filesystem copy fails", async () => {
+    const sourceDir = await makeTempDir();
+    const rootDir = await makeTempDir();
+    const srcFile = path.join(sourceDir, "meeting.vtt");
+    await writeFile(srcFile, "WEBVTT\n\nkeep me", "utf8");
+
+    const exdev = Object.assign(new Error("cross-device link"), { code: "EXDEV" });
+    const renameSpy = spyOn(fs, "rename").mockRejectedValueOnce(exdev);
+    const copySpy = spyOn(fs, "copyFile").mockRejectedValueOnce(new Error("copy failed"));
+    try {
+      await expect(intakeFile(srcFile, intakeConfig(rootDir, sourceDir))).rejects.toThrow(
+        "copy failed",
+      );
+      expect(await fileExists(srcFile)).toBe(true);
+    } finally {
+      copySpy.mockRestore();
+      renameSpy.mockRestore();
+    }
+  });
 });
 
 describe("executeIntake", () => {
@@ -138,22 +191,24 @@ describe("executeIntake", () => {
   test("continues processing when a non-FileGoneError occurs for one file", async () => {
     const sourceDir = await makeTempDir();
     const rootDir = await makeTempDir();
-    await writeFile(path.join(sourceDir, "good.vtt"), "WEBVTT\n\nhello", "utf8");
-    await writeFile(path.join(sourceDir, "bad.vtt"), "WEBVTT\n\nworld", "utf8");
-
-    // Block the week subdir by placing a file where a directory should be created.
-    // intakeFile calls mkdir(weekSubpath) - pre-create the year component as a file to break it.
-    const yearDir = path.join(rootDir, weekSubpath(new Date()).split(path.sep)[0]!);
-    await writeFile(yearDir, "blocker", "utf8");
+    await writeFile(path.join(sourceDir, "first.vtt"), "WEBVTT\n\nhello", "utf8");
+    await writeFile(path.join(sourceDir, "second.vtt"), "WEBVTT\n\nworld", "utf8");
 
     const errorSpy = spyOn(logger, "error").mockImplementation(() => {});
+    waitForStableFile.mockClear();
+    waitForStableFile.mockRejectedValueOnce(new Error("stability check failed"));
     try {
       const results = await executeIntake(intakeConfig(rootDir, sourceDir));
+      const failedPath = waitForStableFile.mock.calls[0]![0];
+      const successfulPath = waitForStableFile.mock.calls[1]![0];
 
-      // Both files should fail (same broken dest), but executeIntake should not throw
-      expect(results).toHaveLength(0);
+      expect(waitForStableFile).toHaveBeenCalledTimes(2);
+      expect(results).toHaveLength(1);
+      expect(path.basename(results[0]!)).toBe(path.basename(successfulPath));
+      expect(await fileExists(failedPath)).toBe(true);
+      expect(await fileExists(successfulPath)).toBe(false);
       expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[intake] executeIntake error"),
+        expect.stringContaining(`[intake] executeIntake error for ${failedPath}`),
       );
     } finally {
       errorSpy.mockRestore();
@@ -184,18 +239,6 @@ describe("intakeFile - file gone", () => {
     const nonexistent = path.join(sourceDir, "ghost.vtt");
 
     await expect(intakeFile(nonexistent, cfg)).rejects.toThrow("Source file no longer exists");
-  });
-});
-
-describe("startIntakeWatcher", () => {
-  test("returns a stop function that closes the watcher", async () => {
-    const sourceDir = await makeTempDir();
-    const rootDir = await makeTempDir();
-    const cfg = intakeConfig(rootDir, sourceDir);
-
-    const { stop } = startIntakeWatcher({ config: cfg, onIntake: () => {} });
-    expect(typeof stop).toBe("function");
-    stop();
   });
 });
 
