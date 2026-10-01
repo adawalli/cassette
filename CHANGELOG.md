@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.3](https://github.com/adawalli/cassette/compare/v0.6.2...v0.6.3) (2026-10-01)
+
+
+### Bug Fixes
+
+* correct nine failure paths across processing, intake, and shutdown ([a16d97f](https://github.com/adawalli/cassette/commit/a16d97f3d90589a247ae52cc3d2967b9565b1a7f))
+
 ## [0.6.2](https://github.com/adawalli/cassette/compare/v0.6.1...v0.6.2) (2026-03-31)
 
 
