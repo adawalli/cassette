@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/adawalli/cassette/compare/v0.6.3...v0.7.0) (2026-10-01)
+
+
+### Features
+
+* handle unsupported LLM parameters without losing transcripts ([dfb402a](https://github.com/adawalli/cassette/commit/dfb402a076069a91d3712f546580e5c8901bb816))
+
 ## [0.6.3](https://github.com/adawalli/cassette/compare/v0.6.2...v0.6.3) (2026-10-01)
 
 
