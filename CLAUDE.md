@@ -10,7 +10,7 @@ Use Bun throughout - never Node/npm/pnpm/vite/jest.
 - `bun test` to run all tests
 - `bun test test/processor.test.ts` to run a single test file
 - `bun run typecheck` to typecheck (`tsc --noEmit`) - CI and the pre-push hook both run it
-- `bun install` to install dependencies
+- `bun run install:deps --frozen-lockfile` to install repository dependencies (Bun >=1.3)
 
 `src/` uses only `node:*` APIs so the published bundle runs under Node (`--target node`). Bun-only
 APIs (`Bun.file`, `Bun.write`, `Bun.Glob`) are fine in `test/`, never in `src/`.
