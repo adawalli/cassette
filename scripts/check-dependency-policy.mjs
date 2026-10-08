@@ -5,6 +5,23 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { runInNewContext } from "node:vm";
+
+// Check the actual installer guard at both sides of the supported Bun floor.
+const manifest = JSON.parse(await readFile("package.json", "utf8"));
+const guard = manifest.private
+  ? manifest.scripts.preinstall.match(/^bun -e '(.*)'$/)[1]
+  : (await readFile("scripts/install.mjs", "utf8")).replace(/^import .*;\n/gm, "");
+for (const version of ["1.2.14", "1.3.0"]) {
+  const check = () =>
+    runInNewContext(guard, {
+      Bun: { version, semver: globalThis.Bun.semver },
+      spawnSync: () => ({ status: 0 }),
+      process: { execPath: "bun", argv: ["bun", "install.mjs"], exit() {} },
+    });
+  if (version === "1.2.14") assert.throws(check, /Use Bun >=1.3.0/);
+  else assert.doesNotThrow(check);
+}
 
 // Test real Bun resolution without public registry access or package downloads.
 const directory = await mkdtemp(join(tmpdir(), "dependency-age-"));
