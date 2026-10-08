@@ -1,6 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ]
+  "extends": ["config:best-practices", ":approveMajorUpdates"],
+  "automerge": false,
+  "prConcurrentLimit": 3,
+  "timezone": "America/New_York",
+  "vulnerabilityAlerts": {
+    "automerge": false
+  }
 }
