@@ -8,19 +8,21 @@ import { promisify } from "node:util";
 import { runInNewContext } from "node:vm";
 
 // Check the actual installer guard at both sides of the supported Bun floor.
-const manifest = JSON.parse(await readFile("package.json", "utf8"));
-const guard = manifest.private
-  ? manifest.scripts.preinstall.match(/^bun -e '(.*)'$/)[1]
-  : (await readFile("scripts/install.mjs", "utf8")).replace(/^import .*;\n/gm, "");
+const guard = (await readFile("scripts/install.mjs", "utf8")).replace(/^import .*;\n/gm, "");
 for (const version of ["1.2.14", "1.3.0"]) {
+  let installs = 0;
   const check = () =>
     runInNewContext(guard, {
       Bun: { version, semver: globalThis.Bun.semver },
-      spawnSync: () => ({ status: 0 }),
+      spawnSync: () => {
+        installs++;
+        return { status: 0 };
+      },
       process: { execPath: "bun", argv: ["bun", "install.mjs"], exit() {} },
     });
   if (version === "1.2.14") assert.throws(check, /Use Bun >=1.3.0/);
   else assert.doesNotThrow(check);
+  assert.equal(installs, version === "1.2.14" ? 0 : 1);
 }
 
 // Test real Bun resolution without public registry access or package downloads.

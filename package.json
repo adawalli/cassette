@@ -43,7 +43,8 @@
     "typecheck": "tsc --noEmit",
     "prepare": "husky || true",
     "prepublishOnly": "bun run typecheck && bun test --coverage && bun run build",
-    "install:deps": "bun scripts/install.mjs"
+    "install:deps": "bun scripts/install.mjs",
+    "check:bun": "bun scripts/install.mjs --check"
   },
   "lint-staged": {
     "*.{json,md,yaml,yml}": [
