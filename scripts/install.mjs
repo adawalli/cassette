@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 if (!Bun.semver.satisfies(Bun.version, ">=1.3.0")) {
   throw new Error("Use Bun >=1.3.0; older versions ignore minimumReleaseAge");
 }
+if (process.argv[2] === "--check") process.exit(0);
 const result = spawnSync(process.execPath, ["install", ...process.argv.slice(2)], {
   stdio: "inherit",
 });

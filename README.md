@@ -269,6 +269,10 @@ Use the Bun version in `package.json` (minimum supported: 1.3.0). Bun 1.2
 silently ignores the release cooldown. Use `bun run install:deps --frozen-lockfile`
 for repository installs. This wrapper rejects older Bun before resolution.
 The published CLI still supports Node and npm; it has no Bun preinstall hook.
+Before `bun add` or `bun update`, run `bun run check:bun` in the same shell with
+the same executable. Bare old `bun install` is unsafe: dependency lifecycle
+scripts can run before a project preinstall check fails. Use the checked wrapper
+and keep the pinned supported Bun on PATH.
 
 [Renovate best practices](https://docs.renovatebot.com/presets-config/#configbest-practices)
 provides curated groups, npm releases at least three days old, development
