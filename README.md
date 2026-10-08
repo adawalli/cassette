@@ -262,3 +262,39 @@ changes will break it.
 ## Contributing
 
 See [DEVELOPER.md](DEVELOPER.md) for setup, development workflow, and publishing instructions.
+
+## Dependency updates
+
+Use the Bun version in `package.json` (minimum supported: 1.3.0). Bun 1.2
+silently ignores the release cooldown. Use `bun run install:deps --frozen-lockfile`
+for repository installs. This wrapper rejects older Bun before resolution.
+The published CLI still supports Node and npm; it has no Bun preinstall hook.
+
+[Renovate best practices](https://docs.renovatebot.com/presets-config/#configbest-practices)
+provides curated groups, npm releases at least three days old, development
+package pins, action/container digest pins, and weekly lockfile maintenance.
+All merges are manual. Ordinary PRs are limited to three. Major updates need
+approval in the Dependency Dashboard before Renovate creates the PR.
+
+The cooldown is npm-specific. Renovate's inherited pin, replacement, bump,
+rollback, lockfile update, and maintenance exceptions need review. Bun's
+`minimumReleaseAge = 259200` checks new direct and transitive resolutions,
+including maintenance. Existing versions in `bun.lock` are not rechecked.
+Run `bun scripts/check-dependency-policy.mjs` to verify fresh resolutions
+against a local registry; CI also runs the official strict Renovate validator.
+
+Security alert PRs bypass Renovate's age delay, schedule, ordinary concurrency,
+and major approval. They still require manual review and merge. This requires
+GitHub dependency graph and vulnerability alerts. At this policy review, alerts
+were disabled and the SBOM endpoint returned 404. Renovate activity is confirmed
+by its Dependency Dashboard and open PRs; hosted app permissions are unverified.
+Repository configuration cannot prove hosted global overrides. No settings were
+changed.
+
+For an urgent verified vulnerability, review the advisory, affected range,
+exact fix version, registry artifact, and provenance. In a focused PR, scope a
+Renovate exception to that package and exact version with `minimumReleaseAge:
+"0 days"` after the inherited rules. If Bun blocks the fix, temporarily use
+`minimumReleaseAgeExcludes` for that package and pin the reviewed fix exactly.
+Bun exclusions apply to the whole package, so review all resolved occurrences.
+Remove both exceptions promptly. Never bypass the cooldown to clear a backlog.

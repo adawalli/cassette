@@ -32,10 +32,9 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
-          cache: true
+          bun-version-file: package.json
 
-      - run: bun install
+      - run: bun run install:deps --frozen-lockfile
 
       - name: Run Claude Code
         id: claude

@@ -42,7 +42,8 @@
     "test:coverage": "bun test --coverage",
     "typecheck": "tsc --noEmit",
     "prepare": "husky || true",
-    "prepublishOnly": "bun run typecheck && bun test --coverage && bun run build"
+    "prepublishOnly": "bun run typecheck && bun test --coverage && bun run build",
+    "install:deps": "bun scripts/install.mjs"
   },
   "lint-staged": {
     "*.{json,md,yaml,yml}": [
@@ -65,5 +66,6 @@
     "picomatch": "^4.0.4",
     "yaml": "^2.8.3",
     "zod": "^4.3.6"
-  }
+  },
+  "packageManager": "bun@1.4.2"
 }
