@@ -285,7 +285,8 @@ rollback, lockfile update, and maintenance exceptions need review. Bun's
 `minimumReleaseAge = 259200` checks new direct and transitive resolutions,
 including maintenance. Existing versions in `bun.lock` are not rechecked.
 Run `bun scripts/check-dependency-policy.mjs` to verify fresh resolutions
-against a local registry; CI also runs the official strict Renovate validator.
+against a local registry; CI also runs the strict validator in a digest-pinned
+Renovate 44.133.0 container.
 
 Security alert PRs bypass Renovate's age delay, schedule, ordinary concurrency,
 and major approval. They still require manual review and merge. This requires
