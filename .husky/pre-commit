@@ -6,4 +6,4 @@ else
   echo "Install with: brew install gitleaks"
 fi
 
-bunx lint-staged
+bunx --bun lint-staged
