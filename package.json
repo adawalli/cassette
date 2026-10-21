@@ -53,12 +53,12 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/node": "^26.0.0",
-    "@types/picomatch": "^4.0.2",
-    "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
-    "prettier": "^3.8.1",
-    "typescript": "^7.0.0"
+    "@types/node": "26.6.5",
+    "@types/picomatch": "4.0.3",
+    "husky": "9.1.7",
+    "lint-staged": "16.4.0",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2"
   },
   "dependencies": {
     "jsonpath-plus": "^11.0.0",
