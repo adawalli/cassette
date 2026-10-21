@@ -22,7 +22,7 @@
     "url": "https://github.com/adawalli/cassette/issues"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "bin": {
     "cassette": "dist/index.js"
