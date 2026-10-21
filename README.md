@@ -58,6 +58,8 @@ sequenceDiagram
 
 ## Install
 
+Requires Node.js 22 or later when running with Node.js.
+
 Try it without installing:
 
 ```bash
