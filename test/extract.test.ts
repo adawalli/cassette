@@ -53,6 +53,16 @@ describe("extractTranscriptUnits", () => {
       ),
     ).toThrow();
   });
+
+  test.each([null, false, 0])("rejects a root with no JSONPath result: %p", (input) => {
+    expect(() =>
+      extractTranscriptUnits(input, {
+        path: "$[*]",
+        speaker_field: "speaker",
+        text_field: "text",
+      }),
+    ).toThrow("No transcript entries matched JSONPath '$[*]'");
+  });
 });
 
 describe("renderTranscript", () => {

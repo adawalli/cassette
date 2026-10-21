@@ -38,13 +38,13 @@ export function extractTranscriptUnits(
   json: unknown,
   transcriptConfig: TranscriptConfig,
 ): TranscriptUnit[] {
-  const matches: unknown[] = JSONPath({
+  const matches = JSONPath({
     path: transcriptConfig.path,
     json: json as object,
     wrap: true,
   });
 
-  if (matches.length === 0) {
+  if (!Array.isArray(matches) || matches.length === 0) {
     throw new Error(`No transcript entries matched JSONPath '${transcriptConfig.path}'`);
   }
 
