@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.0.0](https://github.com/adawalli/cassette/compare/v0.7.0...v1.0.0) (2026-10-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* Node.js 20 is no longer supported. Upgrade to Node.js 22 or later before running the CLI.
+
+### Features
+
+* require Node.js 22 or later ([4afaeff](https://github.com/adawalli/cassette/commit/4afaeffc3b611fb2cfa3d4dbf16c29fe7a73831b))
+
+
+### Bug Fixes
+
+* **deps:** update dependency jsonpath-plus to v11 ([be092b4](https://github.com/adawalli/cassette/commit/be092b4fe9c8a34ee8bb40460a3ca1eb8b7534e0))
+* **deps:** update dependency openai to v7 ([cf07273](https://github.com/adawalli/cassette/commit/cf07273354a2e487ff7b13be9be55a14ca133b37))
+* **deps:** update dependency p-retry to v8 ([5b46724](https://github.com/adawalli/cassette/commit/5b46724671d572efd5e2bafa1ee8f056d2c34b71))
+* validate JSONPath 11 extraction results ([8fafd71](https://github.com/adawalli/cassette/commit/8fafd7126fa52d9d8d076dd6a80284952ce40c04))
+
 ## [0.7.0](https://github.com/adawalli/cassette/compare/v0.6.3...v0.7.0) (2026-10-01)
 
 
