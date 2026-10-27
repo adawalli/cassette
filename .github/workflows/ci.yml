@@ -18,7 +18,7 @@ jobs:
 
       - run: bun run install:deps --frozen-lockfile
       - name: Validate Renovate policy
-        uses: docker://renovate/renovate:44.181.6@sha256:aa5593807ecc64295edba8085d75f36f27c82b47e3baf77061108ff6e2f2024b
+        uses: docker://renovate/renovate:44.190.0@sha256:dd348d05edcfba67e30826fb471d5bdee4868c68798abf3719a53915629503f1
         with:
           args: renovate-config-validator --strict --no-global renovate.json
       - run: bun scripts/check-dependency-policy.mjs
