@@ -7,6 +7,9 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { runInNewContext } from "node:vm";
 
+// Bun 1.3 remains supported and cannot read lockfile version 2.
+assert.match(await readFile("bun.lock", "utf8"), /"lockfileVersion":\s*1,/);
+
 // Check the actual installer guard at both sides of the supported Bun floor.
 const guard = (await readFile("scripts/install.mjs", "utf8")).replace(/^import .*;\n/gm, "");
 for (const version of ["1.2.14", "1.3.0"]) {
